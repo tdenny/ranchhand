@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Local-testing template for the ranchhand API (deployed via Terraform in infra/).
+
+Globals:
+  Function:
+    Runtime: python3.13
+    # Deployed as arm64 (infra/lambda.tf); x86_64 here avoids QEMU emulation on an amd64 host.
+    Architectures: [x86_64]
+    MemorySize: 256
+    Timeout: 10
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ranchhand-api
+      CodeUri: backend/src
+      Handler: ranchhand.handler.handler
+      Environment:
+        Variables:
+          TABLE_NAME: ranchhand-herd
+          LOG_LEVEL: INFO
+          # Overridden for local runs by env.local.json (SAM only overrides variables declared here).
+          AWS_ENDPOINT_URL_DYNAMODB: ""

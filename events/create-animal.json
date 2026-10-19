@@ -1,0 +1,7 @@
+{
+  "routeKey": "POST /animals",
+  "number": "99",
+  "status": "active",
+  "sex": "female",
+  "date_of_birth": "2024-03-01"
+}

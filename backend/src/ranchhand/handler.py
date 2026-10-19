@@ -11,18 +11,22 @@ def new_ulid(now_ms=None):
     return "".join(_ALPHABET[(n >> (5 * i)) & 31] for i in reversed(range(26)))
 
 def handler(event, context):
-    dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
-    animal_id = new_ulid()
+    if event.get("routeKey") == "POST /animals":
+        dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
+        animal_id = new_ulid()
 
-    item = {
-                "pk": f"ANIMAL#{animal_id}",
-                "sk": "PROFILE",
-                "entity": "animal",
-                "id": animal_id,
-                "number": "34",
-                "status": "active",
-                "sex": "male",
-                "date_of_birth": "2017-03-01"
-            }
+        item = {
+                    "pk": f"ANIMAL#{animal_id}",
+                    "sk": "PROFILE",
+                    "entity": "animal",
+                    "id": animal_id,
+                    "number": event['number'],
+                    "status": event['status'],
+                    "sex": event['sex'],
+                    "date_of_birth": event['date_of_birth']
+                }
 
-    dynamodb_table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+        dynamodb_table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+    else:
+        return {"statusCode": 404, "headers": {"content-type": "application/json"}, "message": "Route not found"}
+
