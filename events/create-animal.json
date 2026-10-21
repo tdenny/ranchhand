@@ -1,7 +1,13 @@
 {
+  "version": "2.0",
   "routeKey": "POST /animals",
-  "number": "99",
-  "status": "active",
-  "sex": "female",
-  "date_of_birth": "2024-03-01"
+  "rawPath": "/animals",
+  "rawQueryString": "",
+  "headers": { "content-type": "application/json" },
+  "requestContext": {
+    "http": { "method": "POST", "path": "/animals" },
+    "authorizer": { "jwt": { "claims": { "sub": "local-user" } } }
+  },
+  "body": "{\"number\": \"99\", \"status\": \"active\", \"sex\": \"female\", \"date_of_birth\": \"2024-03-01\"}",
+  "isBase64Encoded": false
 }

@@ -1,3 +1,6 @@
+import base64
+import json
+
 import boto3
 from os import urandom
 import time
@@ -10,8 +13,16 @@ def new_ulid(now_ms=None):
     n = (ts << 80) | int.from_bytes(urandom(10), "big")
     return "".join(_ALPHABET[(n >> (5 * i)) & 31] for i in reversed(range(26)))
 
+def parse_body(event):
+    """Decode the JSON request body from an API Gateway HTTP API (v2) event."""
+    body = event.get("body") or "{}"
+    if event.get("isBase64Encoded"):
+        body = base64.b64decode(body).decode()
+    return json.loads(body)
+
 def handler(event, context):
     if event.get("routeKey") == "POST /animals":
+        body = parse_body(event)
         dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
         animal_id = new_ulid()
 
@@ -20,10 +31,10 @@ def handler(event, context):
                     "sk": "PROFILE",
                     "entity": "animal",
                     "id": animal_id,
-                    "number": event['number'],
-                    "status": event['status'],
-                    "sex": event['sex'],
-                    "date_of_birth": event['date_of_birth']
+                    "number": body['number'],
+                    "status": body['status'],
+                    "sex": body['sex'],
+                    "date_of_birth": body['date_of_birth']
                 }
 
         dynamodb_table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
