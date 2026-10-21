@@ -9,3 +9,6 @@ crash.log
 __pycache__/
 .venv/
 .pytest_cache/
+
+# SAM
+.aws-sam/
