@@ -3,8 +3,8 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project   = "ranchhand"
-      source    = "terraform"
+      Project = "ranchhand"
+      source  = "terraform"
     }
   }
 }

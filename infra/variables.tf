@@ -5,7 +5,17 @@ variable "aws_region" {
 }
 
 variable "github_repository" {
-  description = "GitHub repository whose workflows may assume the CI roles."
+  description = "GitHub repository (owner/name) whose workflows may assume the CI roles."
+  type        = string
+}
+
+variable "github_owner_id" {
+  description = "Numeric ID of the GitHub user or organization that owns the repository."
+  type        = string
+}
+
+variable "github_repository_id" {
+  description = "Numeric ID of the GitHub repository."
   type        = string
 }
 

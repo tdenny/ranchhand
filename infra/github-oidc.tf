@@ -10,9 +10,15 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  account_id    = data.aws_caller_identity.current.account_id
-  state_key     = "ranchhand/terraform.tfstate"
-  state_bucket  = "arn:aws:s3:::${var.tf_state_bucket}"
+  account_id   = data.aws_caller_identity.current.account_id
+  state_key    = "ranchhand/terraform.tfstate"
+  state_bucket = "arn:aws:s3:::${var.tf_state_bucket}"
+
+  # GitHub's immutable OIDC subject embeds the numeric owner and repository IDs, so a
+  # recreated or renamed owner/repo cannot match this trust policy.
+  github_owner = split("/", var.github_repository)[0]
+  github_repo  = split("/", var.github_repository)[1]
+  github_sub   = "repo:${local.github_owner}@${var.github_owner_id}/${local.github_repo}@${var.github_repository_id}"
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -39,8 +45,8 @@ data "aws_iam_policy_document" "gha_plan_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:pull_request",
-        "repo:${var.github_repository}:ref:refs/heads/main",
+        "${local.github_sub}:pull_request",
+        "${local.github_sub}:ref:refs/heads/main",
       ]
     }
   }
@@ -64,7 +70,7 @@ data "aws_iam_policy_document" "gha_apply_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/main"]
+      values   = ["${local.github_sub}:ref:refs/heads/main"]
     }
   }
 }

@@ -73,12 +73,14 @@ One-time setup
 
 1. Set the following in ``infra/terraform.tfvars`` (git-ignored). The role
    policies need the state bucket name, and the role trust policies only allow
-   workflows from the GitHub repository named in ``github_repository``:
+   workflows from the GitHub repository identified by the last three values:
 
    .. code-block:: hcl
 
-      tf_state_bucket   = "<your-state-bucket-name>"
-      github_repository = "<owner>/<repository>"
+      tf_state_bucket      = "<your-state-bucket-name>"
+      github_repository    = "<owner>/<repository>"
+      github_owner_id      = "<numeric owner ID>"
+      github_repository_id = "<numeric repository ID>"
 
 2. Create the roles, targeting only the CI resources so the application
    resources are not deployed yet:
@@ -108,6 +110,7 @@ In the workflow
 The job needs ``permissions: id-token: write`` and must pass the role ARN to
 ``aws-actions/configure-aws-credentials``. Terraform receives the state bucket
 name through ``-backend-config="bucket=..."`` and the
-``TF_VAR_tf_state_bucket`` environment variable, and the repository through
-``TF_VAR_github_repository``. Take the bucket name from a GitHub repository
-variable or secret.
+``TF_VAR_tf_state_bucket`` environment variable. The repository and its IDs
+come from the ``github`` context as ``TF_VAR_github_repository``,
+``TF_VAR_github_owner_id`` and ``TF_VAR_github_repository_id``. Take the bucket
+name from a GitHub repository variable or secret.
