@@ -1,5 +1,13 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.10"
+
+  backend "s3" {
+    # bucket is supplied at init time: terraform init -backend-config=backend.hcl
+    key          = "ranchhand/terraform.tfstate"
+    region       = "us-east-2"
+    encrypt      = true
+    use_lockfile = true
+  }
 
   required_providers {
     aws = {

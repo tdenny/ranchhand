@@ -12,3 +12,6 @@ __pycache__/
 
 # SAM
 .aws-sam/
+
+# Backend config (contains the state bucket name)
+infra/backend.hcl
