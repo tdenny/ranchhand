@@ -22,16 +22,25 @@ def parse_body(event):
         body = base64.b64decode(body).decode()
     return json.loads(body)
 
+def bad_request(message):
+    return {
+        "statusCode": 400,
+        "headers": {"content-type": "application/json"},
+        "body": json.dumps({"message": message}),
+    }
+
 def create_animal(event):
     """Handle POST /animals: write a new animal profile to the herd table."""
-    body = parse_body(event)
+    try:
+        body = parse_body(event)
+    except ValueError:  # bad JSON, bad base64, or non-UTF-8 bytes
+        return bad_request("Request body must be valid JSON")
+    if not isinstance(body, dict):
+        return bad_request("Request body must be a JSON object")
+
     missing = [field for field in REQUIRED_ANIMAL_FIELDS if field not in body]
     if missing:
-        return {
-            "statusCode": 400,
-            "headers": {"content-type": "application/json"},
-            "body": json.dumps({"message": f"Missing required fields: {', '.join(missing)}"}),
-        }
+        return bad_request(f"Missing required fields: {', '.join(missing)}")
 
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
     animal = {

@@ -53,6 +53,23 @@ def test_create_animal_returns_201_with_created_animal(table):
     assert json.loads(response["body"]) == {"id": ULID, **BODY}
 
 
+@pytest.mark.parametrize(
+    "event, message",
+    [
+        ({"body": "{not json"}, "Request body must be valid JSON"),
+        ({"body": "!!!", "isBase64Encoded": True}, "Request body must be valid JSON"),
+        ({"body": json.dumps([BODY])}, "Request body must be a JSON object"),
+        ({"body": "42"}, "Request body must be a JSON object"),
+    ],
+)
+def test_create_animal_invalid_body_returns_400_without_writing(table, event, message):
+    response = h.create_animal(event)
+
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"]) == {"message": message}
+    assert table.scan()["Items"] == []
+
+
 def test_create_animal_missing_field_returns_400_without_writing(table):
     body = {k: v for k, v in BODY.items() if k not in ("sex", "status")}
 
