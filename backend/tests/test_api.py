@@ -53,10 +53,12 @@ def test_create_animal_returns_201_with_created_animal(table):
     assert json.loads(response["body"]) == {"id": ULID, **BODY}
 
 
-def test_create_animal_missing_field_raises_without_writing(table):
-    body = {k: v for k, v in BODY.items() if k != "sex"}
+def test_create_animal_missing_field_returns_400_without_writing(table):
+    body = {k: v for k, v in BODY.items() if k not in ("sex", "status")}
 
-    with pytest.raises(KeyError):
-        h.create_animal({"body": json.dumps(body)})
+    response = h.create_animal({"body": json.dumps(body)})
 
+    assert response["statusCode"] == 400
+    assert response["headers"]["content-type"] == "application/json"
+    assert json.loads(response["body"]) == {"message": "Missing required fields: status, sex"}
     assert table.scan()["Items"] == []

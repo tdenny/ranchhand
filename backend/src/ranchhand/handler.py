@@ -6,12 +6,14 @@ from os import urandom
 import time
 
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+REQUIRED_ANIMAL_FIELDS = ("number", "status", "sex", "date_of_birth")
 
 def new_ulid(now_ms=None):
     """48-bit millisecond timestamp + 80 random bits, as 26 sortable characters."""
     ts = int(time.time() * 1000) if now_ms is None else now_ms
     n = (ts << 80) | int.from_bytes(urandom(10), "big")
     return "".join(_ALPHABET[(n >> (5 * i)) & 31] for i in reversed(range(26)))
+
 
 def parse_body(event):
     """Decode the JSON request body from an API Gateway HTTP API (v2) event."""
@@ -23,6 +25,14 @@ def parse_body(event):
 def create_animal(event):
     """Handle POST /animals: write a new animal profile to the herd table."""
     body = parse_body(event)
+    missing = [field for field in REQUIRED_ANIMAL_FIELDS if field not in body]
+    if missing:
+        return {
+            "statusCode": 400,
+            "headers": {"content-type": "application/json"},
+            "body": json.dumps({"message": f"Missing required fields: {', '.join(missing)}"}),
+        }
+
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
     animal = {
             "id": new_ulid(),
