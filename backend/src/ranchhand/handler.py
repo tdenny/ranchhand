@@ -24,20 +24,31 @@ def create_animal(event):
     """Handle POST /animals: write a new animal profile to the herd table."""
     body = parse_body(event)
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
-    animal_id = new_ulid()
+    animal = {
+            "id": new_ulid(),
+            "number": body['number'],
+            "status": body['status'],
+            "sex": body['sex'],
+            "date_of_birth": body['date_of_birth']
+            }
 
-    item = {
-        "pk": f"ANIMAL#{animal_id}",
+    db_record = {
+        "pk": f"ANIMAL#{animal['id']}",
         "sk": "PROFILE",
         "entity": "animal",
-        "id": animal_id,
-        "number": body['number'],
-        "status": body['status'],
-        "sex": body['sex'],
-        "date_of_birth": body['date_of_birth']
+        **animal,
     }
 
-    dynamodb_table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+    dynamodb_table.put_item(Item=db_record, ConditionExpression="attribute_not_exists(pk)")
+
+    return {
+        "statusCode": 201,
+        "headers": {
+            "content-type": "application/json",
+            "location": f"/animals/{animal['id']}",
+        },
+        "body": json.dumps(animal)
+    }
 
 def handler(event, context):
     if event.get("routeKey") == "POST /animals":
