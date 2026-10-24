@@ -20,24 +20,28 @@ def parse_body(event):
         body = base64.b64decode(body).decode()
     return json.loads(body)
 
+def create_animal(event):
+    """Handle POST /animals: write a new animal profile to the herd table."""
+    body = parse_body(event)
+    dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
+    animal_id = new_ulid()
+
+    item = {
+        "pk": f"ANIMAL#{animal_id}",
+        "sk": "PROFILE",
+        "entity": "animal",
+        "id": animal_id,
+        "number": body['number'],
+        "status": body['status'],
+        "sex": body['sex'],
+        "date_of_birth": body['date_of_birth']
+    }
+
+    dynamodb_table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+
 def handler(event, context):
     if event.get("routeKey") == "POST /animals":
-        body = parse_body(event)
-        dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
-        animal_id = new_ulid()
-
-        item = {
-                    "pk": f"ANIMAL#{animal_id}",
-                    "sk": "PROFILE",
-                    "entity": "animal",
-                    "id": animal_id,
-                    "number": body['number'],
-                    "status": body['status'],
-                    "sex": body['sex'],
-                    "date_of_birth": body['date_of_birth']
-                }
-
-        dynamodb_table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+        return create_animal(event)
     else:
         return {"statusCode": 404, "headers": {"content-type": "application/json"}, "message": "Route not found"}
 
