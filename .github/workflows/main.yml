@@ -74,7 +74,7 @@ jobs:
       - name: Build Lambda package
         run: |
           pip install --requirement ../backend/requirements.txt \
-                      --target infra/.build/package \
+                      --target .build/package \
                       --platform manylinux2014_aarch64 \
                       --implementation cp \
                       --python-version 3.13 \
