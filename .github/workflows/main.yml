@@ -79,7 +79,7 @@ jobs:
                       --implementation cp \
                       --python-version 3.13 \
                       --only-binary=:all:
-          cp -r ../backend/src/. infra/.build/package
+          cp -r ../backend/src/. ./.build/package
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
