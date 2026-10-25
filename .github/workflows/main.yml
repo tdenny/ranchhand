@@ -41,7 +41,7 @@ jobs:
 
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.14.7'
+          python-version: '3.13'
 
       - name: Install dependencies
         working-directory: backend
@@ -66,6 +66,20 @@ jobs:
         working-directory: infra
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Build Lambda package
+        run: |
+          pip install --requirement backend/requirements.txt \
+                      --target infra/.build/package \
+                      --platform manylinux2014_aarch64 \
+                      --implementation cp \
+                      --python-version 3.13 \
+                      --only-binary=:all:
+          cp -r backend/src/. infra/.build/package
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -113,6 +127,16 @@ jobs:
         working-directory: infra
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14.7'
+
+      - name: Build Lambda package
+        run: |
+          pip install --requirement backend/requirements.txt --target infra/.build/package \
+            --platform manylinux2014_aarch64 --implementation cp --python-version 3.13 --only-binary=:all:
+          cp -r backend/src/. infra/.build/package
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
