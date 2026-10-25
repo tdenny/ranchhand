@@ -15,7 +15,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: ranchhand-api
-      CodeUri: backend/src
+      CodeUri: .aws-sam/local-package
       Handler: ranchhand.handler.handler
       Environment:
         Variables:
