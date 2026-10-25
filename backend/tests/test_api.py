@@ -77,5 +77,20 @@ def test_create_animal_missing_field_returns_400_without_writing(table):
 
     assert response["statusCode"] == 400
     assert response["headers"]["content-type"] == "application/json"
-    assert json.loads(response["body"]) == {"message": "Missing required fields: status, sex"}
+    assert json.loads(response["body"]) == {
+        "message": "Invalid animal",
+        "errors": [
+            {"type": "missing", "loc": ["status"], "msg": "Field required"},
+            {"type": "missing", "loc": ["sex"], "msg": "Field required"},
+        ],
+    }
+    assert table.scan()["Items"] == []
+
+
+def test_create_animal_invalid_date_of_birth_returns_400_without_writing(table):
+    response = h.create_animal({"body": json.dumps({**BODY, "date_of_birth": "last spring"})})
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [e["loc"] for e in errors] == [["date_of_birth"]]
     assert table.scan()["Items"] == []

@@ -5,8 +5,11 @@ import boto3
 from os import urandom
 import time
 
+from pydantic import ValidationError
+
+from ranchhand.models import AnimalIn
+
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-REQUIRED_ANIMAL_FIELDS = ("number", "status", "sex", "date_of_birth")
 
 def new_ulid(now_ms=None):
     """48-bit millisecond timestamp + 80 random bits, as 26 sortable characters."""
@@ -22,11 +25,11 @@ def parse_body(event):
         body = base64.b64decode(body).decode()
     return json.loads(body)
 
-def bad_request(message):
+def bad_request(message, **extra):
     return {
         "statusCode": 400,
         "headers": {"content-type": "application/json"},
-        "body": json.dumps({"message": message}),
+        "body": json.dumps({"message": message, **extra}),
     }
 
 def create_animal(event):
@@ -38,18 +41,13 @@ def create_animal(event):
     if not isinstance(body, dict):
         return bad_request("Request body must be a JSON object")
 
-    missing = [field for field in REQUIRED_ANIMAL_FIELDS if field not in body]
-    if missing:
-        return bad_request(f"Missing required fields: {', '.join(missing)}")
+    try:
+        animal_in = AnimalIn.model_validate(body)
+    except ValidationError as e:
+        return bad_request("Invalid animal", errors=e.errors(include_url=False, include_context=False, include_input=False))
 
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
-    animal = {
-            "id": new_ulid(),
-            "number": body['number'],
-            "status": body['status'],
-            "sex": body['sex'],
-            "date_of_birth": body['date_of_birth']
-            }
+    animal = {"id": new_ulid(), **animal_in.model_dump(mode="json")}
 
     db_record = {
         "pk": f"ANIMAL#{animal['id']}",
