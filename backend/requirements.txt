@@ -1,1 +1,2 @@
 pydantic
+aws-lambda-powertools
