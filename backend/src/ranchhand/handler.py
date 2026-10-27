@@ -1,10 +1,9 @@
-import base64
-import json
-
 import boto3
 from os import urandom
 import time
 
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
+from aws_lambda_powertools.event_handler.exceptions import BadRequestError
 from pydantic import ValidationError
 
 from ranchhand.models import AnimalIn
@@ -18,33 +17,33 @@ def new_ulid(now_ms=None):
     return "".join(_ALPHABET[(n >> (5 * i)) & 31] for i in reversed(range(26)))
 
 
-def parse_body(event):
-    """Decode the JSON request body from an API Gateway HTTP API (v2) event."""
-    body = event.get("body") or "{}"
-    if event.get("isBase64Encoded"):
-        body = base64.b64decode(body).decode()
-    return json.loads(body)
+app = APIGatewayHttpResolver()
 
-def bad_request(message, **extra):
-    return {
-        "statusCode": 400,
-        "headers": {"content-type": "application/json"},
-        "body": json.dumps({"message": message, **extra}),
-    }
 
-def create_animal(event):
-    """Handle POST /animals: write a new animal profile to the herd table."""
+@app.exception_handler(ValidationError)
+def invalid_animal(exc: ValidationError):
+    return Response(
+        status_code=400,
+        content_type="application/json",
+        body={
+            "statusCode": 400,
+            "message": "Invalid animal",
+            "errors": exc.errors(include_url=False, include_context=False, include_input=False),
+        },
+    )
+
+
+@app.post("/animals")
+def create_animal():
+    """Write a new animal profile to the herd table."""
     try:
-        body = parse_body(event)
+        body = app.current_event.json_body
     except ValueError:  # bad JSON, bad base64, or non-UTF-8 bytes
-        return bad_request("Request body must be valid JSON")
+        raise BadRequestError("Request body must be valid JSON")
     if not isinstance(body, dict):
-        return bad_request("Request body must be a JSON object")
+        raise BadRequestError("Request body must be a JSON object")
 
-    try:
-        animal_in = AnimalIn.model_validate(body)
-    except ValidationError as e:
-        return bad_request("Invalid animal", errors=e.errors(include_url=False, include_context=False, include_input=False))
+    animal_in = AnimalIn.model_validate(body)  # ValidationError is handled by invalid_animal
 
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
     animal = {"id": new_ulid(), **animal_in.model_dump(mode="json")}
@@ -58,18 +57,13 @@ def create_animal(event):
 
     dynamodb_table.put_item(Item=db_record, ConditionExpression="attribute_not_exists(pk)")
 
-    return {
-        "statusCode": 201,
-        "headers": {
-            "content-type": "application/json",
-            "location": f"/animals/{animal['id']}",
-        },
-        "body": json.dumps(animal)
-    }
+    return Response(
+        status_code=201,
+        content_type="application/json",
+        headers={"location": f"/animals/{animal['id']}"},
+        body=animal,
+    )
+
 
 def handler(event, context):
-    if event.get("routeKey") == "POST /animals":
-        return create_animal(event)
-    else:
-        return {"statusCode": 404, "headers": {"content-type": "application/json"}, "message": "Route not found"}
-
+    return app.resolve(event, context)
