@@ -69,20 +69,31 @@ def test_create_animal_returns_201_with_created_animal(table):
 
 
 @pytest.mark.parametrize(
-    "fields, message",
+    "fields, error_type",
     [
-        ({"body": "{not json"}, "Request body must be valid JSON"),
-        ({"body": "!!!", "isBase64Encoded": True}, "Request body must be a JSON object"),
-        ({"body": json.dumps([BODY])}, "Request body must be a JSON object"),
-        ({"body": "42"}, "Request body must be a JSON object"),
-        ({}, "Request body must be a JSON object"),
+        ({"body": "{not json"}, "json_invalid"),
+        ({"body": "!!!", "isBase64Encoded": True}, "missing"),
+        ({"body": "42"}, "model_attributes_type"),
+        ({"body": json.dumps([1])}, "model_attributes_type"),
+        ({}, "missing"),
     ],
 )
-def test_create_animal_invalid_body_returns_400_without_writing(table, fields, message):
+def test_create_animal_invalid_body_returns_400_without_writing(table, fields, error_type):
     response = h.handler(api_event(**fields), None)
 
     assert response["statusCode"] == 400
-    assert json.loads(response["body"]) == {"statusCode": 400, "message": message}
+    body = json.loads(response["body"])
+    assert body["message"] == "Invalid request"
+    assert [e["type"] for e in body["errors"]] == [error_type]
+    assert table.scan()["Items"] == []
+
+
+def test_create_animal_array_body_returns_400_without_writing(table):
+    # Powertools validation alone would silently create an animal from the first element.
+    response = h.handler(api_event(body=json.dumps([BODY, BODY])), None)
+
+    assert response["statusCode"] == 400
+    assert json.loads(response["body"]) == {"statusCode": 400, "message": "Request body must be a JSON object"}
     assert table.scan()["Items"] == []
 
 
@@ -95,10 +106,10 @@ def test_create_animal_missing_field_returns_400_without_writing(table):
     assert response["headers"]["Content-Type"] == "application/json"
     assert json.loads(response["body"]) == {
         "statusCode": 400,
-        "message": "Invalid animal",
+        "message": "Invalid request",
         "errors": [
-            {"type": "missing", "loc": ["status"], "msg": "Field required"},
-            {"type": "missing", "loc": ["sex"], "msg": "Field required"},
+            {"type": "missing", "loc": ["body", "status"], "msg": "Field required"},
+            {"type": "missing", "loc": ["body", "sex"], "msg": "Field required"},
         ],
     }
     assert table.scan()["Items"] == []
@@ -109,7 +120,7 @@ def test_create_animal_invalid_date_of_birth_returns_400_without_writing(table):
 
     assert response["statusCode"] == 400
     errors = json.loads(response["body"])["errors"]
-    assert [e["loc"] for e in errors] == [["date_of_birth"]]
+    assert [e["loc"] for e in errors] == [["body", "date_of_birth"]]
     assert table.scan()["Items"] == []
 
 

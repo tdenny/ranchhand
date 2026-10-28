@@ -4,7 +4,7 @@ import time
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.exceptions import BadRequestError
-from pydantic import ValidationError
+from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
 from ranchhand.models import AnimalIn
 
@@ -17,34 +17,36 @@ def new_ulid(now_ms=None):
     return "".join(_ALPHABET[(n >> (5 * i)) & 31] for i in reversed(range(26)))
 
 
-app = APIGatewayHttpResolver()
+app = APIGatewayHttpResolver(enable_validation=True)
 
 
-@app.exception_handler(ValidationError)
-def invalid_animal(exc: ValidationError):
+@app.exception_handler(RequestValidationError)
+def invalid_request(exc: RequestValidationError):
     return Response(
         status_code=400,
         content_type="application/json",
         body={
             "statusCode": 400,
-            "message": "Invalid animal",
-            "errors": exc.errors(include_url=False, include_context=False, include_input=False),
+            "message": "Invalid request",
+            "errors": [{key: err[key] for key in ("type", "loc", "msg")} for err in exc.errors()],
         },
     )
 
 
-@app.post("/animals")
-def create_animal():
-    """Write a new animal profile to the herd table."""
+def require_json_object(app, next_middleware):
+    """Reject non-object JSON bodies; validation would otherwise take the first element of an array."""
     try:
         body = app.current_event.json_body
-    except ValueError:  # bad JSON, bad base64, or non-UTF-8 bytes
-        raise BadRequestError("Request body must be valid JSON")
-    if not isinstance(body, dict):
+    except ValueError:  # let validation report malformed JSON
+        body = None
+    if body is not None and not isinstance(body, dict):
         raise BadRequestError("Request body must be a JSON object")
+    return next_middleware(app)
 
-    animal_in = AnimalIn.model_validate(body)  # ValidationError is handled by invalid_animal
 
+@app.post("/animals", middlewares=[require_json_object])
+def create_animal(animal_in: AnimalIn) -> Response[dict]:
+    """Write a new animal profile to the herd table."""
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
     animal = {"id": new_ulid(), **animal_in.model_dump(mode="json")}
 
