@@ -1,4 +1,5 @@
 import boto3
+from boto3.dynamodb.conditions import Attr
 from os import urandom
 import time
 
@@ -64,6 +65,29 @@ def create_animal(animal_in: AnimalIn) -> Response[dict]:
         content_type="application/json",
         headers={"location": f"/animals/{animal['id']}"},
         body=animal,
+    )
+
+
+@app.get("/animals")
+def list_animals() -> Response[dict]:
+    """Return every animal profile in the herd table."""
+    dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
+    scan_kwargs = {"FilterExpression": Attr("entity").eq("animal")}
+    items = []
+
+    while True:
+        page = dynamodb_table.scan(**scan_kwargs)
+        items.extend(page["Items"])
+        if "LastEvaluatedKey" not in page:
+            break
+        scan_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+
+    animals = [{k: v for k, v in item.items() if k not in ("pk", "sk", "entity")} for item in items]
+
+    return Response(
+        status_code=200,
+        content_type="application/json",
+        body={"animals": animals},
     )
 
 
