@@ -129,3 +129,27 @@ def test_unknown_route_returns_404():
 
     assert response["statusCode"] == 404
     assert json.loads(response["body"])["message"] == "Not found"
+
+
+def test_list_animals_returns_all_animals(table):
+    other = {**BODY, "number": "102"}
+    for i, body in enumerate((BODY, other)):
+        table.put_item(
+            Item={"pk": f"ANIMAL#{i}", "sk": "PROFILE", "entity": "animal", "id": str(i), **body}
+        )
+    table.put_item(Item={"pk": "OTHER#1", "sk": "PROFILE", "entity": "other"})
+
+    response = h.handler(api_event("GET /animals"), None)
+
+    assert response["statusCode"] == 200
+    assert sorted(json.loads(response["body"])["animals"], key=lambda a: a["id"]) == [
+        {"id": "0", **BODY},
+        {"id": "1", **other},
+    ]
+
+
+def test_list_animals_empty_herd_returns_empty_list(table):
+    response = h.handler(api_event("GET /animals"), None)
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"]) == {"animals": []}
