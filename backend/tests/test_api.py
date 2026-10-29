@@ -148,6 +148,23 @@ def test_list_animals_returns_all_animals(table):
     ]
 
 
+def test_get_animal_returns_animal(table):
+    table.put_item(
+        Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY}
+    )
+
+    response = h.handler(api_event(f"GET /animals/{ULID}"), None)
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"]) == {"id": ULID, **BODY}
+
+
+def test_get_animal_unknown_id_returns_404(table):
+    response = h.handler(api_event(f"GET /animals/{ULID}"), None)
+
+    assert response["statusCode"] == 404
+
+
 def test_list_animals_empty_herd_returns_empty_list(table):
     response = h.handler(api_event("GET /animals"), None)
 
