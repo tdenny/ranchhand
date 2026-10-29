@@ -4,7 +4,7 @@ from os import urandom
 import time
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
-from aws_lambda_powertools.event_handler.exceptions import BadRequestError
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
 from ranchhand.models import AnimalIn
@@ -34,18 +34,12 @@ def invalid_request(exc: RequestValidationError):
     )
 
 
-def require_json_object(app, next_middleware):
-    """Reject non-object JSON bodies; validation would otherwise take the first element of an array."""
-    try:
-        body = app.current_event.json_body
-    except ValueError:  # let validation report malformed JSON
-        body = None
-    if body is not None and not isinstance(body, dict):
-        raise BadRequestError("Request body must be a JSON object")
-    return next_middleware(app)
+def to_animal(item):
+    """Strip the table's key and entity attributes from a stored item."""
+    return {k: v for k, v in item.items() if k not in ("pk", "sk", "entity")}
 
 
-@app.post("/animals", middlewares=[require_json_object])
+@app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[dict]:
     """Write a new animal profile to the herd table."""
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
@@ -82,12 +76,26 @@ def list_animals() -> Response[dict]:
             break
         scan_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
 
-    animals = [{k: v for k, v in item.items() if k not in ("pk", "sk", "entity")} for item in items]
+    return Response(
+        status_code=200,
+        content_type="application/json",
+        body={"animals": [to_animal(item) for item in items]},
+    )
+
+
+@app.get("/animals/<animal_id>")
+def get_animal(animal_id: str) -> Response[dict]:
+    """Return a single animal profile."""
+    dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
+    item = dynamodb_table.get_item(Key={"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}).get("Item")
+
+    if item is None:
+        raise NotFoundError(f"Animal {animal_id} not found")
 
     return Response(
         status_code=200,
         content_type="application/json",
-        body={"animals": animals},
+        body=to_animal(item),
     )
 
 

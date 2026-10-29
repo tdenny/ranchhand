@@ -89,11 +89,12 @@ def test_create_animal_invalid_body_returns_400_without_writing(table, fields, e
 
 
 def test_create_animal_array_body_returns_400_without_writing(table):
-    # Powertools validation alone would silently create an animal from the first element.
+    # This basically tests that Powertools works as expected, but
+    # Powertools < 3.38 silently created an animal from the first element.
     response = h.handler(api_event(body=json.dumps([BODY, BODY])), None)
 
     assert response["statusCode"] == 400
-    assert json.loads(response["body"]) == {"statusCode": 400, "message": "Request body must be a JSON object"}
+    assert json.loads(response["body"])["errors"][0]["type"] == "model_attributes_type"
     assert table.scan()["Items"] == []
 
 
@@ -146,6 +147,23 @@ def test_list_animals_returns_all_animals(table):
         {"id": "0", **BODY},
         {"id": "1", **other},
     ]
+
+
+def test_get_animal_returns_animal(table):
+    table.put_item(
+        Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY}
+    )
+
+    response = h.handler(api_event(f"GET /animals/{ULID}"), None)
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"]) == {"id": ULID, **BODY}
+
+
+def test_get_animal_unknown_id_returns_404(table):
+    response = h.handler(api_event(f"GET /animals/{ULID}"), None)
+
+    assert response["statusCode"] == 404
 
 
 def test_list_animals_empty_herd_returns_empty_list(table):
