@@ -1,21 +1,12 @@
 import boto3
 from boto3.dynamodb.conditions import Attr
-from os import urandom
-import time
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
 from ranchhand.models import AnimalIn
-
-_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-
-def new_ulid(now_ms=None):
-    """48-bit millisecond timestamp + 80 random bits, as 26 sortable characters."""
-    ts = int(time.time() * 1000) if now_ms is None else now_ms
-    n = (ts << 80) | int.from_bytes(urandom(10), "big")
-    return "".join(_ALPHABET[(n >> (5 * i)) & 31] for i in reversed(range(26)))
+from ranchhand.ulid import new_ulid
 
 
 app = APIGatewayHttpResolver(enable_validation=True)
