@@ -1,6 +1,6 @@
 import re
 
-from ranchhand.handler import new_ulid
+from ranchhand.ulid import new_ulid
 
 ULID_RE = re.compile(r"[0-7][0-9A-HJKMNP-TV-Z]{25}")
 
