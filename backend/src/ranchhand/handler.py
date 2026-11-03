@@ -5,8 +5,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
-from ranchhand.models import AnimalIn
-from ranchhand.ulid import new_ulid
+from ranchhand.models import Animal, AnimalIn
 
 
 app = APIGatewayHttpResolver(enable_validation=True)
@@ -26,15 +25,15 @@ def invalid_request(exc: RequestValidationError):
 
 
 def to_animal(item):
-    """Strip the table's key and entity attributes from a stored item."""
-    return {k: v for k, v in item.items() if k not in ("pk", "sk", "entity")}
+    """Build the API representation of a stored item."""
+    return Animal.model_validate(item).model_dump(mode="json")
 
 
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[dict]:
     """Write a new animal profile to the herd table."""
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
-    animal = {"id": new_ulid(), **animal_in.model_dump(mode="json")}
+    animal = Animal(**animal_in.model_dump()).model_dump(mode="json")
 
     db_record = {
         "pk": f"ANIMAL#{animal['id']}",
