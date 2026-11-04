@@ -25,16 +25,16 @@ def invalid_request(exc: RequestValidationError):
 
 
 @app.post("/animals")
-def create_animal(animal_in: AnimalIn) -> Response[dict]:
+def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
-    animal = Animal(**animal_in.model_dump()).model_dump(mode="json")
+    animal = Animal(**animal_in.model_dump())
 
     db_record = {
-        "pk": f"ANIMAL#{animal['id']}",
+        "pk": f"ANIMAL#{animal.id}",
         "sk": "PROFILE",
         "entity": "animal",
-        **animal,
+        **animal.model_dump(mode="json"),
     }
 
     dynamodb_table.put_item(Item=db_record, ConditionExpression="attribute_not_exists(pk)")
@@ -42,7 +42,7 @@ def create_animal(animal_in: AnimalIn) -> Response[dict]:
     return Response(
         status_code=201,
         content_type="application/json",
-        headers={"location": f"/animals/{animal['id']}"},
+        headers={"location": f"/animals/{animal.id}"},
         body=animal,
     )
 
