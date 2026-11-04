@@ -5,7 +5,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
-from ranchhand.models import Animal, AnimalIn
+from ranchhand.models import Animal, AnimalIn, AnimalList
 
 
 app = APIGatewayHttpResolver(enable_validation=True)
@@ -22,11 +22,6 @@ def invalid_request(exc: RequestValidationError):
             "errors": [{key: err[key] for key in ("type", "loc", "msg")} for err in exc.errors()],
         },
     )
-
-
-def to_animal(item):
-    """Build the API representation of a stored item."""
-    return Animal.model_validate(item).model_dump(mode="json")
 
 
 @app.post("/animals")
@@ -53,7 +48,7 @@ def create_animal(animal_in: AnimalIn) -> Response[dict]:
 
 
 @app.get("/animals")
-def list_animals() -> Response[dict]:
+def list_animals() -> Response[AnimalList]:
     """Return every animal profile in the herd table."""
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
     scan_kwargs = {"FilterExpression": Attr("entity").eq("animal")}
@@ -69,12 +64,12 @@ def list_animals() -> Response[dict]:
     return Response(
         status_code=200,
         content_type="application/json",
-        body={"animals": [to_animal(item) for item in items]},
+        body=AnimalList(animals=items),
     )
 
 
 @app.get("/animals/<animal_id>")
-def get_animal(animal_id: str) -> Response[dict]:
+def get_animal(animal_id: str) -> Response[Animal]:
     """Return a single animal profile."""
     dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
     item = dynamodb_table.get_item(Key={"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}).get("Item")
@@ -85,7 +80,7 @@ def get_animal(animal_id: str) -> Response[dict]:
     return Response(
         status_code=200,
         content_type="application/json",
-        body=to_animal(item),
+        body=Animal.model_validate(item),
     )
 
 

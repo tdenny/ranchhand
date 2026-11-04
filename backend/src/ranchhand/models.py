@@ -19,3 +19,9 @@ class Animal(AnimalIn):
 
     # The lambda looks up new_ulid at call time so tests can patch it.
     id: str = Field(default_factory=lambda: new_ulid())
+
+
+class AnimalList(BaseModel):
+    """Response body for GET /animals."""
+
+    animals: list[Animal]
