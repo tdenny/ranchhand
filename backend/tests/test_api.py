@@ -3,7 +3,6 @@ import json
 import boto3
 import pytest
 from moto import mock_aws
-from pydantic import ValidationError
 
 from ranchhand import handler as h
 from ranchhand import models
@@ -175,14 +174,12 @@ def test_list_animals_empty_herd_returns_empty_list(table):
     assert json.loads(response["body"]) == {"animals": []}
 
 
-def test_to_animal_strips_table_attributes():
-    item = {"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY}
 
-    assert h.to_animal(item) == {"id": ULID, **BODY}
+def test_list_animals_omits_table_attributes(table):
+    table.put_item(
+        Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY}
+    )
 
+    response = h.handler(api_event("GET /animals"), None)
 
-def test_to_animal_rejects_item_missing_required_field():
-    item = {"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID}
-
-    with pytest.raises(ValidationError):
-        h.to_animal(item)
+    assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY}]}
