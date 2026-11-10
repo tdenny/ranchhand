@@ -10,6 +10,11 @@ from ranchhand.models import Animal, AnimalIn, AnimalList
 app = APIGatewayHttpResolver(enable_validation=True)
 
 
+def get_ddb_table():
+    """Return the herd DynamoDB table resource."""
+    return boto3.resource("dynamodb").Table("ranchhand-herd")
+
+
 @app.exception_handler(RequestValidationError)
 def invalid_request(exc: RequestValidationError):
     return Response(
@@ -26,7 +31,7 @@ def invalid_request(exc: RequestValidationError):
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
-    dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
+    dynamodb_table = get_ddb_table()
     animal = Animal(**animal_in.model_dump())
 
     db_record = {
@@ -49,7 +54,7 @@ def create_animal(animal_in: AnimalIn) -> Response[Animal]:
 @app.get("/animals")
 def list_animals() -> Response[AnimalList]:
     """Return every animal profile in the herd table."""
-    dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
+    dynamodb_table = get_ddb_table()
     scan_kwargs = {"FilterExpression": Attr("entity").eq("animal")}
     items = []
 
@@ -70,7 +75,7 @@ def list_animals() -> Response[AnimalList]:
 @app.get("/animals/<animal_id>")
 def get_animal(animal_id: str) -> Response[Animal]:
     """Return a single animal profile."""
-    dynamodb_table = boto3.resource("dynamodb").Table("ranchhand-herd")
+    dynamodb_table = get_ddb_table()
     item = dynamodb_table.get_item(Key={"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}).get("Item")
 
     if item is None:
