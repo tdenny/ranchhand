@@ -183,3 +183,50 @@ def test_list_animals_omits_table_attributes(table):
     response = h.handler(api_event("GET /animals"), None)
 
     assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY}]}
+
+
+EVENT_BODY = {"type": "vaccination", "date": "2024-05-01", "notes": "annual booster"}
+
+
+def test_create_animal_event_writes_event_item(table):
+    h.handler(api_event(body=json.dumps(BODY)), None)
+    h.handler(api_event("POST /animals/{}/events".format(ULID), body=json.dumps(EVENT_BODY)), None)
+
+    item = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": f"EVENT#{ULID}"})["Item"]
+    assert item == {
+        "pk": f"ANIMAL#{ULID}",
+        "sk": f"EVENT#{ULID}",
+        "entity": "event",
+        "id": ULID,
+        "animal_id": ULID,
+        **EVENT_BODY,
+    }
+
+
+def test_create_animal_event_returns_201(table):
+    h.handler(api_event(body=json.dumps(BODY)), None)
+    response = h.handler(
+        api_event(f"POST /animals/{ULID}/events", body=json.dumps(EVENT_BODY)), None
+    )
+
+    assert response["statusCode"] == 201
+    assert response["headers"]["location"] == f"/animals/{ULID}/events/{ULID}"
+    assert json.loads(response["body"]) == {"id": ULID, "animal_id": ULID, **EVENT_BODY}
+
+
+def test_create_animal_event_unknown_animal_returns_404(table):
+    response = h.handler(
+        api_event("POST /animals/nope/events", body=json.dumps(EVENT_BODY)), None
+    )
+
+    assert response["statusCode"] == 404
+    assert table.scan()["Items"] == []
+
+
+def test_create_animal_event_invalid_body_returns_400(table):
+    h.handler(api_event(body=json.dumps(BODY)), None)
+    response = h.handler(
+        api_event(f"POST /animals/{ULID}/events", body=json.dumps({"type": "x"})), None
+    )
+
+    assert response["statusCode"] == 400
