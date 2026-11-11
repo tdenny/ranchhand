@@ -5,7 +5,7 @@ from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
-from ranchhand.models import Animal, AnimalIn, AnimalList
+from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn
 
 app = APIGatewayHttpResolver(enable_validation=True)
 
@@ -85,4 +85,32 @@ def get_animal(animal_id: str) -> Response[Animal]:
         status_code=200,
         content_type="application/json",
         body=Animal.model_validate(item),
+    )
+
+
+@app.post("/animals/<animal_id>/events")
+def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
+    """Write a new event for an existing animal to the herd table."""
+    dynamodb_table = get_ddb_table()
+    profile_key = {"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}
+
+    if dynamodb_table.get_item(Key=profile_key).get("Item") is None:
+        raise NotFoundError(f"Animal {animal_id} not found")
+
+    event = Event(animal_id=animal_id, **event_in.model_dump())
+
+    db_record = {
+        "pk": f"ANIMAL#{animal_id}",
+        "sk": f"EVENT#{event.id}",
+        "entity": "event",
+        **event.model_dump(mode="json"),
+    }
+
+    dynamodb_table.put_item(Item=db_record, ConditionExpression="attribute_not_exists(pk)")
+
+    return Response(
+        status_code=201,
+        content_type="application/json",
+        headers={"location": f"/animals/{animal_id}/events/{event.id}"},
+        body=event,
     )
