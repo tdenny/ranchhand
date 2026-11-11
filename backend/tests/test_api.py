@@ -9,6 +9,12 @@ from ranchhand import models
 
 BODY = {"number": "101", "status": "active", "sex": "female", "date_of_birth": "2020-04-01"}
 ULID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+TOKEN = "test-token"
+
+
+@pytest.fixture(autouse=True)
+def api_token(monkeypatch):
+    monkeypatch.setenv("API_TOKEN", TOKEN)
 
 
 def api_event(route_key="POST /animals", **fields):
@@ -19,7 +25,7 @@ def api_event(route_key="POST /animals", **fields):
         "routeKey": route_key,
         "rawPath": path,
         "rawQueryString": "",
-        "headers": {"content-type": "application/json"},
+        "headers": {"content-type": "application/json", "authorization": f"Bearer {TOKEN}"},
         "requestContext": {"stage": "$default", "http": {"method": method, "path": path}},
         "isBase64Encoded": False,
         **fields,
@@ -230,3 +236,48 @@ def test_create_animal_event_invalid_body_returns_400(table):
     )
 
     assert response["statusCode"] == 400
+
+
+@pytest.mark.parametrize(
+    "authorization",
+    [None, "", "Bearer", "Bearer wrong", "Bearer tøken", TOKEN, f"Basic {TOKEN}", f"Bearer {TOKEN} extra"],
+)
+def test_bad_authorization_returns_401_without_writing(table, authorization):
+    event = api_event(body=json.dumps(BODY))
+    event["headers"].pop("authorization")
+    if authorization is not None:
+        event["headers"]["authorization"] = authorization
+
+    response = h.handler(event, None)
+
+    assert response["statusCode"] == 401
+    assert response["headers"]["WWW-Authenticate"] == "Bearer"
+    assert json.loads(response["body"])["message"] == "Unauthorized"
+    assert table.scan()["Items"] == []
+
+
+def test_invalid_body_without_token_returns_401_not_400(table):
+    event = api_event(body="{not json")
+    del event["headers"]["authorization"]
+
+    assert h.handler(event, None)["statusCode"] == 401
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_unset_api_token_rejects_everything(table, monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("API_TOKEN")
+    else:
+        monkeypatch.setenv("API_TOKEN", value)
+
+    for header in ("Bearer ", "Bearer"):
+        event = api_event(body=json.dumps(BODY))
+        event["headers"]["authorization"] = header
+        assert h.handler(event, None)["statusCode"] == 401
+
+
+def test_authorization_header_name_is_case_insensitive(table):
+    event = api_event(body=json.dumps(BODY))
+    event["headers"] = {"Authorization": f"bearer {TOKEN}"}
+
+    assert h.handler(event, None)["statusCode"] == 201

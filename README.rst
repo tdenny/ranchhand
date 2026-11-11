@@ -66,6 +66,12 @@ Finally, invoke the function with one of the sample events in ``events/``::
     REPORT RequestId: d921ad62-0aed-4e7a-898f-22cf821f55de	Init Duration: 0.01 ms	Duration: 249.00 ms	Billed Duration: 249 ms	Memory Size: 256 MB	Max Memory Used: 256 MB
     {"statusCode": 201, "headers": {"content-type": "application/json", "location": "/animals/01M5T0CPNF8QRAMRRY0ZV9YJD2"}, "body": "{\"id\": \"01M5T0CPNF8QRAMRRY0ZV9YJD2\", \"number\": \"99\", \"status\": \"active\", \"sex\": \"female\", \"date_of_birth\": \"2024-03-01\"}"}
 
+.. note::
+   When using Docker instead of podman, edit ``AWS_ENDPOINT_URL_DYNAMODB`` in
+   ``env.local.json`` to use Docker's hostname instead of podman's::
+
+      "AWS_ENDPOINT_URL_DYNAMODB": "http://host.docker.internal:8000",
+
 Stop DynamoDB Local when finished::
 
     podman rm -f ranchhand-ddb
