@@ -5,7 +5,7 @@ import pytest
 from moto import mock_aws
 
 from ranchhand import handler as h
-from ranchhand import models
+from ranchhand import models, routes
 
 BODY = {"number": "101", "status": "active", "sex": "female", "date_of_birth": "2020-04-01"}
 ULID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -281,3 +281,44 @@ def test_authorization_header_name_is_case_insensitive(table):
     event["headers"] = {"Authorization": f"bearer {TOKEN}"}
 
     assert h.handler(event, None)["statusCode"] == 201
+
+
+ORIGIN = "http://localhost:8000"
+
+
+@pytest.fixture
+def cors_origin(monkeypatch):
+    monkeypatch.setattr(routes.cors_config, "_allowed_origins", [ORIGIN])
+
+
+def test_preflight_succeeds_without_token(cors_origin):
+    event = api_event("OPTIONS /animals", headers={
+        "origin": ORIGIN,
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "authorization",
+    })
+
+    response = h.handler(event, None)
+
+    assert response["statusCode"] == 204
+    assert response["headers"]["Access-Control-Allow-Origin"] == ORIGIN
+    assert "Authorization" in response["headers"]["Access-Control-Allow-Headers"]
+
+
+def test_unauthorized_response_carries_cors_headers(cors_origin):
+    event = api_event("GET /animals", headers={"origin": ORIGIN})
+
+    response = h.handler(event, None)
+
+    assert response["statusCode"] == 401
+    assert response["headers"]["Access-Control-Allow-Origin"] == ORIGIN
+
+
+def test_list_animals_response_carries_cors_headers(table, cors_origin):
+    event = api_event("GET /animals")
+    event["headers"]["origin"] = ORIGIN
+
+    response = h.handler(event, None)
+
+    assert response["statusCode"] == 200
+    assert response["headers"]["Access-Control-Allow-Origin"] == ORIGIN

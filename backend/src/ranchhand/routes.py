@@ -4,14 +4,19 @@ import os
 import boto3
 from boto3.dynamodb.conditions import Attr
 
-from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
+from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig, Response
 from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
 from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn
 
-app = APIGatewayHttpResolver(enable_validation=True)
+# A little awkward for now, but browsers send a credential-less preflight
+# before the Authorization header; allow only the configured frontend origin.
+# With CORS_ALLOW_ORIGIN unset, no origin is allowed.
+cors_config = CORSConfig(allow_origin=os.environ.get("CORS_ALLOW_ORIGIN", ""))
+
+app = APIGatewayHttpResolver(enable_validation=True, cors=cors_config)
 
 
 def unauthorized_response() -> Response | None:
@@ -32,6 +37,10 @@ def unauthorized_response() -> Response | None:
 
 
 def require_token(app: APIGatewayHttpResolver, next_middleware: NextMiddleware) -> Response:
+    # CORS preflights are sent without credentials and return no data.
+    if app.current_event.http_method == "OPTIONS":
+        return next_middleware(app)
+
     return unauthorized_response() or next_middleware(app)
 
 

@@ -72,6 +72,33 @@ Finally, invoke the function with one of the sample events in ``events/``::
 
       "AWS_ENDPOINT_URL_DYNAMODB": "http://host.docker.internal:8000",
 
+Running the API locally
+-----------------------
+
+To serve the API over HTTP (for the frontend, or ``curl``) instead of invoking
+it once, start DynamoDB Local and build the package as above, then run::
+
+    sam local start-api
+
+The API listens on ``http://127.0.0.1:3000`` and uses the ``API_TOKEN`` and
+``CORS_ALLOW_ORIGIN`` values from ``env.local.json`` (``local-token`` and
+``http://localhost:8080``). Rebuild the package and restart after changing
+anything under ``backend/src``::
+
+    curl -H "Authorization: Bearer local-token" http://127.0.0.1:3000/animals
+
+Frontend
+--------
+
+The frontend in ``frontend/`` is plain HTML and ES modules with no build step.
+Modules do not load from ``file://``, so serve it on port 8080 (port 8000 is
+DynamoDB Local, and 8080 must match ``CORS_ALLOW_ORIGIN``)::
+
+    python3 -m http.server 8080 --directory frontend
+
+Open http://localhost:8080 and enter the API token when prompted (``local-token``
+locally). The API base URL is set in ``frontend/js/config.js``.
+
 Stop DynamoDB Local when finished::
 
     podman rm -f ranchhand-ddb
