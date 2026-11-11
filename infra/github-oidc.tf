@@ -167,6 +167,13 @@ data "aws_iam_policy_document" "gha_apply" {
     ]
   }
 
+  # CreateLogDelivery does not support resource-level permissions.
+  statement {
+    sid       = "LogDelivery"
+    actions   = ["logs:CreateLogDelivery"]
+    resources = ["*"]
+  }
+
   # API Gateway v2 IAM resources are path-based, so they cannot be scoped by API name.
   statement {
     sid       = "ApiGateway"
