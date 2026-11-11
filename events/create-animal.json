@@ -3,7 +3,7 @@
   "routeKey": "POST /animals",
   "rawPath": "/animals",
   "rawQueryString": "",
-  "headers": { "content-type": "application/json" },
+  "headers": { "content-type": "application/json", "authorization": "Bearer local-token" },
   "requestContext": {
     "stage": "$default",
     "http": { "method": "POST", "path": "/animals" },

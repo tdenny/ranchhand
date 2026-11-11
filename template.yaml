@@ -21,5 +21,6 @@ Resources:
         Variables:
           TABLE_NAME: ranchhand-herd
           LOG_LEVEL: INFO
+          API_TOKEN: ""
           # Overridden for local runs by env.local.json (SAM only overrides variables declared here).
           AWS_ENDPOINT_URL_DYNAMODB: ""

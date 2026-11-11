@@ -1,13 +1,41 @@
+import hmac
+import os
+
 import boto3
 from boto3.dynamodb.conditions import Attr
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, Response
+from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
 from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn
 
 app = APIGatewayHttpResolver(enable_validation=True)
+
+
+def unauthorized_response() -> Response | None:
+    """Return a 401 unless the request carries the shared bearer token in API_TOKEN."""
+    expected = os.environ.get("API_TOKEN", "")
+    header = app.current_event.headers.get("authorization", "")
+    scheme, _, supplied = header.partition(" ")
+
+    if expected and scheme.lower() == "bearer" and hmac.compare_digest(supplied.encode(), expected.encode()):
+        return None
+
+    return Response(
+        status_code=401,
+        content_type="application/json",
+        headers={"WWW-Authenticate": "Bearer"},
+        body={"statusCode": 401, "message": "Unauthorized"},
+    )
+
+
+def require_token(app: APIGatewayHttpResolver, next_middleware: NextMiddleware) -> Response:
+    return unauthorized_response() or next_middleware(app)
+
+
+app.use(middlewares=[require_token])
 
 
 def get_ddb_table():
@@ -17,6 +45,10 @@ def get_ddb_table():
 
 @app.exception_handler(RequestValidationError)
 def invalid_request(exc: RequestValidationError):
+    # Validation runs before middleware; don't describe the schema to unauthenticated callers.
+    if (rejection := unauthorized_response()) is not None:
+        return rejection
+
     return Response(
         status_code=400,
         content_type="application/json",
