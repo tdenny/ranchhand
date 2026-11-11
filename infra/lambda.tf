@@ -1,3 +1,8 @@
+resource "random_password" "api_token" {
+  length  = 48
+  special = false
+}
+
 data "archive_file" "api" {
   type        = "zip"
   source_dir  = "${path.module}/.build/package"
