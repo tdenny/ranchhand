@@ -44,3 +44,9 @@ class Event(EventIn):
 
     id: str = Field(default_factory=lambda: new_ulid())
     animal_id: str
+
+
+class EventList(BaseModel):
+    """Response body for GET /animals/<animal_id>/events."""
+
+    events: list[Event]
