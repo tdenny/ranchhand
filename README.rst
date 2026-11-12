@@ -99,6 +99,13 @@ DynamoDB Local, and 8080 must match ``CORS_ALLOW_ORIGIN``)::
 Open http://localhost:8080 and enter the API token when prompted (``local-token``
 locally). The API base URL is set in ``frontend/js/config.js``.
 
+Run the frontend tests (``node:test`` with jsdom and a stubbed ``fetch``, so no
+API needs to be running)::
+
+    cd frontend
+    npm install
+    npm test
+
 Stop DynamoDB Local when finished::
 
     podman rm -f ranchhand-ddb
