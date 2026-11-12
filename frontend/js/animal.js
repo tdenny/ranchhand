@@ -1,6 +1,8 @@
 import {
   NotFoundError,
   UnauthorizedError,
+  ValidationError,
+  createEvent,
   getAnimal,
   getToken,
   listAnimalEvents,
@@ -16,6 +18,8 @@ const detailsEl = document.querySelector("#profile-details");
 const eventsSectionEl = document.querySelector("#events-section");
 const eventsStatusEl = document.querySelector("#events-status");
 const eventListEl = document.querySelector("#event-list");
+const formEl = document.querySelector("#event-form");
+const formStatusEl = document.querySelector("#form-status");
 
 function showStatus(el, message, isError = false) {
   el.textContent = message;
@@ -107,8 +111,55 @@ async function load() {
   renderEvents(events.value);
 }
 
+// Today as YYYY-MM-DD in the user's timezone (toISOString would use UTC).
+function today() {
+  return new Date().toLocaleDateString("en-CA");
+}
+
+function resetForm() {
+  formEl.reset();
+  formEl.elements.date.value = today();
+}
+
+formEl.addEventListener("submit", async (submitEvent) => {
+  submitEvent.preventDefault();
+
+  if (!getToken() && !askForToken()) {
+    showStatus(formStatusEl, "A token is required to log events.", true);
+    return;
+  }
+
+  const submitButton = formEl.querySelector("button[type=submit]");
+  submitButton.disabled = true;
+  showStatus(formStatusEl, "Saving…");
+
+  const { type, date, notes } = Object.fromEntries(new FormData(formEl));
+
+  try {
+    const event = await createEvent(animalId, { type, date, notes: notes.trim() || null });
+    // The list is newest first, so the new event goes on top.
+    eventListEl.prepend(eventItem(event));
+    showStatus(eventsStatusEl, "");
+    resetForm();
+    showStatus(formStatusEl, `Logged ${event.type}.`);
+  } catch (error) {
+    let message = `Could not log the event. ${error.message}`;
+    if (error instanceof UnauthorizedError) {
+      message = "Token rejected. Use “Set token” to try another.";
+    } else if (error instanceof NotFoundError) {
+      message = "Animal not found.";
+    } else if (error instanceof ValidationError) {
+      message = error.describe();
+    }
+    showStatus(formStatusEl, message, true);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
 document.querySelector("#token-button").addEventListener("click", () => {
   if (askForToken()) load();
 });
 
+resetForm();
 load();

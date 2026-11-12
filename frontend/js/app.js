@@ -54,11 +54,6 @@ async function load() {
   }
 }
 
-function describeValidationErrors(errors) {
-  if (!errors.length) return "The API rejected the animal.";
-  return errors.map(({ loc, msg }) => `${loc.at(-1)}: ${msg}`).join("; ");
-}
-
 formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -82,7 +77,7 @@ formEl.addEventListener("submit", async (event) => {
     if (error instanceof UnauthorizedError) {
       message = "Token rejected. Use “Set token” to try another.";
     } else if (error instanceof ValidationError) {
-      message = describeValidationErrors(error.errors);
+      message = error.describe();
     }
     showStatus(message, true, formStatusEl);
   } finally {
