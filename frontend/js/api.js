@@ -8,9 +8,14 @@ export class NotFoundError extends Error {}
 
 export class ValidationError extends Error {
   constructor(errors) {
-    super("The API rejected the animal.");
+    super("The API rejected the request.");
     // Each entry has `loc` (e.g. ["body", "number"]) and `msg`.
     this.errors = errors;
+  }
+
+  describe() {
+    if (!this.errors.length) return this.message;
+    return this.errors.map(({ loc, msg }) => `${loc.at(-1)}: ${msg}`).join("; ");
   }
 }
 
@@ -72,4 +77,8 @@ export function getAnimal(id) {
 export async function listAnimalEvents(id) {
   const { events } = await request(`/animals/${encodeURIComponent(id)}/events`);
   return events;
+}
+
+export function createEvent(animalId, event) {
+  return request(`/animals/${encodeURIComponent(animalId)}/events`, { method: "POST", body: event });
 }

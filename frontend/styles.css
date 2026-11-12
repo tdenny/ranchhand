@@ -61,7 +61,7 @@ form {
 
 label { display: grid; gap: 0.25rem; font-size: 0.9rem; color: var(--muted); }
 
-input, select {
+input, select, textarea {
   min-height: 2.75rem;
   padding: 0 0.5rem;
   font: inherit;
@@ -70,6 +70,8 @@ input, select {
   border-radius: 0.5rem;
   background: #fff;
 }
+
+textarea { padding: 0.5rem; resize: vertical; }
 
 form button {
   min-height: 2.75rem;

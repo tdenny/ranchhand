@@ -21,6 +21,21 @@
     </section>
 
     <section id="events-section" hidden>
+      <h2>Log event</h2>
+      <form id="event-form">
+        <label>Type
+          <input name="type" required autocomplete="off">
+        </label>
+        <label>Date
+          <input name="date" type="date" required>
+        </label>
+        <label>Notes (optional)
+          <textarea name="notes" rows="3"></textarea>
+        </label>
+        <button type="submit">Log event</button>
+        <p id="form-status" role="status"></p>
+      </form>
+
       <h2>Events</h2>
       <p id="events-status" role="status"></p>
       <ul id="event-list"></ul>
