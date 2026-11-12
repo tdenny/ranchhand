@@ -123,6 +123,24 @@ def test_create_animal_missing_field_returns_400_without_writing(table):
     assert table.scan()["Items"] == []
 
 
+@pytest.mark.parametrize("status", ["Active", "archived", "", None])
+def test_create_animal_invalid_status_returns_400_without_writing(table, status):
+    response = h.handler(api_event(body=json.dumps({**BODY, "status": status})), None)
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [e["loc"] for e in errors] == [["body", "status"]]
+    assert table.scan()["Items"] == []
+
+
+@pytest.mark.parametrize("status", ["active", "deceased", "processed", "sold"])
+def test_create_animal_accepts_each_status(table, status):
+    response = h.handler(api_event(body=json.dumps({**BODY, "status": status})), None)
+
+    assert response["statusCode"] == 201
+    assert json.loads(response["body"])["status"] == status
+
+
 def test_create_animal_invalid_date_of_birth_returns_400_without_writing(table):
     response = h.handler(api_event(body=json.dumps({**BODY, "date_of_birth": "last spring"})), None)
 

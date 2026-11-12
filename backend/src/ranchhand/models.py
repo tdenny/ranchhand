@@ -1,15 +1,19 @@
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from ranchhand.ulid import new_ulid
 
 
+Status = Literal["active", "deceased", "processed", "sold"]
+
+
 class AnimalIn(BaseModel):
     """Request body for POST /animals."""
 
     number: str
-    status: str
+    status: Status
     sex: str
     date_of_birth: date
 
