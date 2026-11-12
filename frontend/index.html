@@ -12,6 +12,32 @@
     <button id="token-button" type="button" class="link">Set token</button>
   </header>
   <main>
+    <h2>Add animal</h2>
+    <form id="animal-form">
+      <label>Number
+        <input name="number" required autocomplete="off">
+      </label>
+      <label>Sex
+        <select name="sex" required>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+        </select>
+      </label>
+      <label>Status
+        <select name="status" required>
+          <option value="active">Active</option>
+          <option value="deceased">Deceased</option>
+          <option value="processed">Processed</option>
+          <option value="sold">Sold</option>
+        </select>
+      </label>
+      <label>Date of birth
+        <input name="date_of_birth" type="date" required>
+      </label>
+      <button type="submit">Add animal</button>
+      <p id="form-status" role="status"></p>
+    </form>
+
     <h2>Animals</h2>
     <p id="status" role="status"></p>
     <ul id="animal-list"></ul>
