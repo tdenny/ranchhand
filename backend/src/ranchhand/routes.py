@@ -2,14 +2,14 @@ import hmac
 import os
 
 import boto3
-from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import Attr, Key
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig, Response
 from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 
-from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn
+from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn, EventList
 
 # A little awkward for now, but browsers send a credential-less preflight
 # before the Authorization header; allow only the configured frontend origin.
@@ -154,4 +154,34 @@ def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
         content_type="application/json",
         headers={"location": f"/animals/{animal_id}/events/{event.id}"},
         body=event,
+    )
+
+
+@app.get("/animals/<animal_id>/events")
+def list_animal_events(animal_id: str) -> Response[EventList]:
+    """Return an animal's events, newest first."""
+    dynamodb_table = get_ddb_table()
+    profile_key = {"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}
+
+    if dynamodb_table.get_item(Key=profile_key).get("Item") is None:
+        raise NotFoundError(f"Animal {animal_id} not found")
+
+    # Event sort keys are ULIDs, so key order is chronological.
+    query_kwargs = {
+        "KeyConditionExpression": Key("pk").eq(f"ANIMAL#{animal_id}") & Key("sk").begins_with("EVENT#"),
+        "ScanIndexForward": False,
+    }
+    items = []
+
+    while True:
+        page = dynamodb_table.query(**query_kwargs)
+        items.extend(page["Items"])
+        if "LastEvaluatedKey" not in page:
+            break
+        query_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+
+    return Response(
+        status_code=200,
+        content_type="application/json",
+        body=EventList(events=items),
     )

@@ -340,3 +340,70 @@ def test_list_animals_response_carries_cors_headers(table, cors_origin):
 
     assert response["statusCode"] == 200
     assert response["headers"]["Access-Control-Allow-Origin"] == ORIGIN
+
+
+def put_event(table, animal_id, event_id, **fields):
+    table.put_item(Item={
+        "pk": f"ANIMAL#{animal_id}",
+        "sk": f"EVENT#{event_id}",
+        "entity": "event",
+        "id": event_id,
+        "animal_id": animal_id,
+        **{**EVENT_BODY, **fields},
+    })
+
+
+def test_list_animal_events_returns_events_newest_first(table):
+    h.handler(api_event(body=json.dumps(BODY)), None)
+    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA1", type="vaccination")
+    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA3", type="weighing")
+    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA2", type="treatment")
+
+    response = h.handler(api_event(f"GET /animals/{ULID}/events"), None)
+
+    assert response["statusCode"] == 200
+    events = json.loads(response["body"])["events"]
+    assert [e["id"] for e in events] == [
+        "01ARZ3NDEKTSV4RRFFQ69G5FA3",
+        "01ARZ3NDEKTSV4RRFFQ69G5FA2",
+        "01ARZ3NDEKTSV4RRFFQ69G5FA1",
+    ]
+    assert events[0] == {
+        "id": "01ARZ3NDEKTSV4RRFFQ69G5FA3",
+        "animal_id": ULID,
+        **{**EVENT_BODY, "type": "weighing"},
+    }
+
+
+def test_list_animal_events_omits_profile_and_other_animals_events(table):
+    other = "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+    h.handler(api_event(body=json.dumps(BODY)), None)
+    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA1")
+    put_event(table, other, "01ARZ3NDEKTSV4RRFFQ69G5FA2")
+
+    response = h.handler(api_event(f"GET /animals/{ULID}/events"), None)
+
+    events = json.loads(response["body"])["events"]
+    assert [e["id"] for e in events] == ["01ARZ3NDEKTSV4RRFFQ69G5FA1"]
+
+
+def test_list_animal_events_without_events_returns_empty_list(table):
+    h.handler(api_event(body=json.dumps(BODY)), None)
+
+    response = h.handler(api_event(f"GET /animals/{ULID}/events"), None)
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"]) == {"events": []}
+
+
+def test_list_animal_events_unknown_animal_returns_404(table):
+    response = h.handler(api_event(f"GET /animals/{ULID}/events"), None)
+
+    assert response["statusCode"] == 404
+
+
+def test_list_animal_events_requires_token(table):
+    event = api_event(f"GET /animals/{ULID}/events")
+    del event["headers"]["authorization"]
+
+    assert h.handler(event, None)["statusCode"] == 401
