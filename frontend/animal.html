@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Animal · Ranchhand</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Ranchhand</h1>
+    <button id="token-button" type="button" class="link">Set token</button>
+  </header>
+  <main>
+    <p><a href="index.html">&larr; All animals</a></p>
+    <p id="status" role="status"></p>
+
+    <section id="profile" hidden>
+      <h2 id="profile-title"></h2>
+      <dl id="profile-details"></dl>
+    </section>
+
+    <section id="events-section" hidden>
+      <h2>Events</h2>
+      <p id="events-status" role="status"></p>
+      <ul id="event-list"></ul>
+    </section>
+  </main>
+  <script type="module" src="js/animal.js"></script>
+</body>
+</html>

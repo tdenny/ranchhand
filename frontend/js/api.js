@@ -4,6 +4,8 @@ const TOKEN_KEY = "ranchhand.token";
 
 export class UnauthorizedError extends Error {}
 
+export class NotFoundError extends Error {}
+
 export class ValidationError extends Error {
   constructor(errors) {
     super("The API rejected the animal.");
@@ -41,6 +43,9 @@ async function request(path, { method = "GET", body } = {}) {
   if (response.status === 401) {
     throw new UnauthorizedError("The API rejected the token.");
   }
+  if (response.status === 404) {
+    throw new NotFoundError("Not found.");
+  }
   if (response.status === 400) {
     const { errors = [] } = await response.json().catch(() => ({}));
     throw new ValidationError(errors);
@@ -58,4 +63,13 @@ export async function listAnimals() {
 
 export function createAnimal(animal) {
   return request("/animals", { method: "POST", body: animal });
+}
+
+export function getAnimal(id) {
+  return request(`/animals/${encodeURIComponent(id)}`);
+}
+
+export async function listAnimalEvents(id) {
+  const { events } = await request(`/animals/${encodeURIComponent(id)}/events`);
+  return events;
 }
