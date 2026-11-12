@@ -15,3 +15,6 @@ __pycache__/
 
 # Backend config (contains the state bucket name)
 infra/backend.hcl
+
+# Frontend
+node_modules/
