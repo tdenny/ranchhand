@@ -4,8 +4,8 @@ import {
   createAnimal,
   getToken,
   listAnimals,
-  setToken,
 } from "./api.js";
+import { askForToken } from "./auth.js";
 
 const statusEl = document.querySelector("#status");
 const listEl = document.querySelector("#animal-list");
@@ -20,8 +20,9 @@ function showStatus(message, isError = false, el = statusEl) {
 function animalItem(animal) {
   const item = document.createElement("li");
 
-  const number = document.createElement("div");
+  const number = document.createElement("a");
   number.className = "number";
+  number.href = `animal.html?id=${encodeURIComponent(animal.id)}`;
   number.textContent = `#${animal.number}`;
 
   const details = document.createElement("div");
@@ -30,13 +31,6 @@ function animalItem(animal) {
 
   item.append(number, details);
   return item;
-}
-
-function askForToken() {
-  const token = window.prompt("Enter the API token:", getToken());
-  if (token === null) return false;
-  setToken(token.trim());
-  return true;
 }
 
 async function load() {
