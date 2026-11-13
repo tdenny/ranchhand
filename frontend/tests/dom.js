@@ -12,9 +12,9 @@ const FRONTEND_DIR = new URL("../", import.meta.url);
  *
  * Globals and module state are shared, so each test file should load one page.
  */
-export async function loadPage(page, { fetchStub, token = "test-token" } = {}) {
+export async function loadPage(page, { search = "", fetchStub, token = "test-token" } = {}) {
   const dom = new JSDOM(readFileSync(new URL(page, FRONTEND_DIR), "utf8"), {
-    url: `http://localhost:8080/${page}`,
+    url: `http://localhost:8080/${page}${search}`,
   });
   const { window } = dom;
 
