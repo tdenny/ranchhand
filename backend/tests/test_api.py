@@ -8,6 +8,7 @@ from ranchhand import handler as h
 from ranchhand import models, routes
 
 BODY = {"number": "101", "status": "active", "sex": "female", "date_of_birth": "2020-04-01"}
+PARENTS_UNSET = {"sire_id": None, "dam_id": None}
 ULID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 TOKEN = "test-token"
 
@@ -72,7 +73,7 @@ def test_create_animal_returns_201_with_created_animal(table):
     assert response["statusCode"] == 201
     assert response["headers"]["Content-Type"] == "application/json"
     assert response["headers"]["location"] == f"/animals/{ULID}"
-    assert json.loads(response["body"]) == {"id": ULID, **BODY}
+    assert json.loads(response["body"]) == {"id": ULID, **BODY, **PARENTS_UNSET}
 
 
 @pytest.mark.parametrize(
@@ -169,8 +170,8 @@ def test_list_animals_returns_all_animals(table):
 
     assert response["statusCode"] == 200
     assert sorted(json.loads(response["body"])["animals"], key=lambda a: a["id"]) == [
-        {"id": "0", **BODY},
-        {"id": "1", **other},
+        {"id": "0", **BODY, **PARENTS_UNSET},
+        {"id": "1", **other, **PARENTS_UNSET},
     ]
 
 
@@ -182,7 +183,7 @@ def test_get_animal_returns_animal(table):
     response = h.handler(api_event(f"GET /animals/{ULID}"), None)
 
     assert response["statusCode"] == 200
-    assert json.loads(response["body"]) == {"id": ULID, **BODY}
+    assert json.loads(response["body"]) == {"id": ULID, **BODY, **PARENTS_UNSET}
 
 
 def test_get_animal_unknown_id_returns_404(table):
@@ -206,7 +207,7 @@ def test_list_animals_omits_table_attributes(table):
 
     response = h.handler(api_event("GET /animals"), None)
 
-    assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY}]}
+    assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY, **PARENTS_UNSET}]}
 
 
 EVENT_BODY = {"type": "vaccination", "date": "2024-05-01", "notes": "annual booster"}
@@ -407,3 +408,26 @@ def test_list_animal_events_requires_token(table):
     del event["headers"]["authorization"]
 
     assert h.handler(event, None)["statusCode"] == 401
+
+
+def test_create_animal_stores_sire_and_dam_and_omits_blank(table):
+    body = {**BODY, "sire_id": "01SIRE", "dam_id": "  "}
+    response = h.handler(api_event(body=json.dumps(body)), None)
+    assert response["statusCode"] == 201
+    created = json.loads(response["body"])
+    assert created["sire_id"] == "01SIRE"
+    assert created["dam_id"] is None
+    item = table.get_item(Key={"pk": f"ANIMAL#{created['id']}", "sk": "PROFILE"})["Item"]
+    assert item["sire_id"] == "01SIRE"
+    assert "dam_id" not in item
+
+
+def test_create_animal_accepts_animal_id_or_free_text_parents(table):
+    sire = "Safe & Sound - Angus Reg# 19705988"
+    body = {**BODY, "sire_id": sire, "dam_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
+    response = h.handler(api_event(body=json.dumps(body)), None)
+    assert response["statusCode"] == 201
+    created = json.loads(response["body"])
+    assert (created["sire_id"], created["dam_id"]) == (sire, "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+    item = table.get_item(Key={"pk": f"ANIMAL#{created['id']}", "sk": "PROFILE"})["Item"]
+    assert (item["sire_id"], item["dam_id"]) == (sire, "01ARZ3NDEKTSV4RRFFQ69G5FAV")

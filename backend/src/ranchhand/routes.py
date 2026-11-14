@@ -79,7 +79,8 @@ def create_animal(animal_in: AnimalIn) -> Response[Animal]:
         "pk": f"ANIMAL#{animal.id}",
         "sk": "PROFILE",
         "entity": "animal",
-        **animal.model_dump(mode="json"),
+        # Omit unset sire_id/dam_id: a NULL value is invalid for a GSI key attribute.
+        **animal.model_dump(mode="json", exclude_none=True),
     }
 
     dynamodb_table.put_item(Item=db_record, ConditionExpression="attribute_not_exists(pk)")
