@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ranchhand.ulid import new_ulid
 
@@ -16,6 +16,14 @@ class AnimalIn(BaseModel):
     status: Status
     sex: str
     date_of_birth: date
+    sire_id: str | None = None
+    dam_id: str | None = None
+
+    @field_validator("sire_id", "dam_id")
+    @classmethod
+    def blank_to_none(cls, value: str | None) -> str | None:
+        # These are GSI keys (see infra/dynamodb.tf); DynamoDB rejects empty strings for them.
+        return value.strip() or None if value is not None else None
 
 
 class Animal(AnimalIn):
