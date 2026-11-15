@@ -160,6 +160,45 @@ def test_create_animal_accepts_each_sex(table, sex):
     assert json.loads(response["body"])["sex"] == sex
 
 
+@pytest.mark.parametrize("status", ["active", "deceased", "processed", "sold"])
+@pytest.mark.parametrize("missing", ["omitted", "null"])
+def test_create_animal_missing_date_of_birth_returns_400_unless_external(table, status, missing):
+    body = {**BODY, "status": status}
+    del body["date_of_birth"]
+    if missing == "null":
+        body["date_of_birth"] = None
+
+    response = h.handler(api_event(body=json.dumps(body)), None)
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [e["loc"] for e in errors] == [["body", "date_of_birth"]]
+    assert table.scan()["Items"] == []
+
+
+@pytest.mark.parametrize("missing", ["omitted", "null"])
+def test_create_external_animal_without_date_of_birth_omits_attribute(table, missing):
+    body = {"number": "Black Jack", "status": "external", "sex": "male"}
+    if missing == "null":
+        body["date_of_birth"] = None
+
+    response = h.handler(api_event(body=json.dumps(body)), None)
+
+    assert response["statusCode"] == 201
+    assert json.loads(response["body"])["date_of_birth"] is None
+    item = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE"})["Item"]
+    assert "date_of_birth" not in item
+
+
+def test_get_external_animal_without_date_of_birth(table):
+    h.handler(api_event(body=json.dumps({"number": "Black Jack", "status": "external", "sex": "male"})), None)
+
+    response = h.handler(api_event(f"GET /animals/{ULID}"), None)
+
+    assert response["statusCode"] == 200
+    assert json.loads(response["body"])["date_of_birth"] is None
+
+
 def test_create_animal_invalid_date_of_birth_returns_400_without_writing(table):
     response = h.handler(api_event(body=json.dumps({**BODY, "date_of_birth": "last spring"})), None)
 
