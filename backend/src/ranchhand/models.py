@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from ranchhand.ulid import new_ulid
 
 
-Status = Literal["active", "deceased", "processed", "sold"]
+Status = Literal["active", "deceased", "processed", "sold", "external"]
 
 
 class AnimalIn(BaseModel):

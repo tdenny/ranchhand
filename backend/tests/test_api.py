@@ -134,7 +134,7 @@ def test_create_animal_invalid_status_returns_400_without_writing(table, status)
     assert table.scan()["Items"] == []
 
 
-@pytest.mark.parametrize("status", ["active", "deceased", "processed", "sold"])
+@pytest.mark.parametrize("status", ["active", "deceased", "processed", "sold", "external"])
 def test_create_animal_accepts_each_status(table, status):
     response = h.handler(api_event(body=json.dumps({**BODY, "status": status})), None)
 
