@@ -62,7 +62,7 @@ resource "aws_dynamodb_table" "herd" {
     }
 
     key_schema {
-      attribute_name = "date_of_birth"
+      attribute_name = "number"
       key_type       = "RANGE"
     }
     projection_type = "ALL"
