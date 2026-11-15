@@ -27,7 +27,7 @@ boto3.client("dynamodb").create_table(
     ],
     GlobalSecondaryIndexes=[
         gsi("number-index", "number", "pk"),
-        gsi("status-index", "status", "date_of_birth"),
+        gsi("status-index", "status", "number"),
         gsi("sire-index", "sire_id", "date_of_birth"),
         gsi("dam-index", "dam_id", "date_of_birth"),
     ],
