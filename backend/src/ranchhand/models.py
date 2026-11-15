@@ -7,6 +7,7 @@ from ranchhand.ulid import new_ulid
 
 
 Status = Literal["active", "deceased", "processed", "sold", "external"]
+Sex = Literal["female", "male"]
 
 
 class AnimalIn(BaseModel):
@@ -14,7 +15,7 @@ class AnimalIn(BaseModel):
 
     number: str
     status: Status
-    sex: str
+    sex: Sex
     date_of_birth: date
     sire_id: str | None = None
     dam_id: str | None = None

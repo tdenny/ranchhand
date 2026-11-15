@@ -142,6 +142,24 @@ def test_create_animal_accepts_each_status(table, status):
     assert json.loads(response["body"])["status"] == status
 
 
+@pytest.mark.parametrize("sex", ["Female", "cow", "", None])
+def test_create_animal_invalid_sex_returns_400_without_writing(table, sex):
+    response = h.handler(api_event(body=json.dumps({**BODY, "sex": sex})), None)
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [e["loc"] for e in errors] == [["body", "sex"]]
+    assert table.scan()["Items"] == []
+
+
+@pytest.mark.parametrize("sex", ["female", "male"])
+def test_create_animal_accepts_each_sex(table, sex):
+    response = h.handler(api_event(body=json.dumps({**BODY, "sex": sex})), None)
+
+    assert response["statusCode"] == 201
+    assert json.loads(response["body"])["sex"] == sex
+
+
 def test_create_animal_invalid_date_of_birth_returns_400_without_writing(table):
     response = h.handler(api_event(body=json.dumps({**BODY, "date_of_birth": "last spring"})), None)
 
