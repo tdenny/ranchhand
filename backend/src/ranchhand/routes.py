@@ -1,15 +1,17 @@
 import hmac
 import os
+from typing import Annotated, get_args
 
 import boto3
-from boto3.dynamodb.conditions import Attr, Key
+from boto3.dynamodb.conditions import Key
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig, Response
 from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
+from aws_lambda_powertools.event_handler.openapi.params import Query
 
-from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn, EventList
+from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn, EventList, Status
 
 # A little awkward for now, but browsers send a credential-less preflight
 # before the Authorization header; allow only the configured frontend origin.
@@ -94,18 +96,26 @@ def create_animal(animal_in: AnimalIn) -> Response[Animal]:
 
 
 @app.get("/animals")
-def list_animals() -> Response[AnimalList]:
-    """Return every animal profile in the herd table."""
+def list_animals(status: Annotated[list[Status] | None, Query()] = None) -> Response[AnimalList]:
+    """Return animal profiles, optionally limited to the given statuses (repeat ?status=).
+
+    Without a status filter, every animal except external ones is returned.
+    """
     dynamodb_table = get_ddb_table()
-    scan_kwargs = {"FilterExpression": Attr("entity").eq("animal")}
+    statuses = list(dict.fromkeys(status)) if status else [s for s in get_args(Status) if s != "external"]
     items = []
 
-    while True:
-        page = dynamodb_table.scan(**scan_kwargs)
-        items.extend(page["Items"])
-        if "LastEvaluatedKey" not in page:
-            break
-        scan_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+    for animal_status in statuses:
+        query_kwargs = {"IndexName": "status-index", "KeyConditionExpression": Key("status").eq(animal_status)}
+
+        while True:
+            page = dynamodb_table.query(**query_kwargs)
+            items.extend(page["Items"])
+            if "LastEvaluatedKey" not in page:
+                break
+            query_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+
+    items.sort(key=lambda item: item["number"])
 
     return Response(
         status_code=200,

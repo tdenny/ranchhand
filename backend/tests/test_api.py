@@ -48,8 +48,25 @@ def table(monkeypatch):
                 {"AttributeName": "sk", "KeyType": "RANGE"},
             ],
             AttributeDefinitions=[
-                {"AttributeName": "pk", "AttributeType": "S"},
-                {"AttributeName": "sk", "AttributeType": "S"},
+                {"AttributeName": a, "AttributeType": "S"}
+                for a in ("pk", "sk", "number", "status", "date_of_birth", "sire_id", "dam_id")
+            ],
+            # Mirrors infra/dynamodb.tf.
+            GlobalSecondaryIndexes=[
+                {
+                    "IndexName": name,
+                    "KeySchema": [
+                        {"AttributeName": hash_key, "KeyType": "HASH"},
+                        {"AttributeName": range_key, "KeyType": "RANGE"},
+                    ],
+                    "Projection": {"ProjectionType": "ALL"},
+                }
+                for name, hash_key, range_key in (
+                    ("number-index", "number", "pk"),
+                    ("status-index", "status", "number"),
+                    ("sire-index", "sire_id", "date_of_birth"),
+                    ("dam-index", "dam_id", "date_of_birth"),
+                )
             ],
         )
 
@@ -265,6 +282,82 @@ def test_list_animals_omits_table_attributes(table):
     response = h.handler(api_event("GET /animals"), None)
 
     assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY, **PARENTS_UNSET}]}
+
+
+def put_animal(table, animal_id, **fields):
+    """Store an animal; a field set to None is left out (as the API does for unset values)."""
+    item = {"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE", "entity": "animal", "id": animal_id, **BODY, **fields}
+    table.put_item(Item={k: v for k, v in item.items() if v is not None})
+
+
+def generate_get_animals_api_event(*statuses):
+    """GET /animals as API Gateway HTTP API (v2) sends repeated parameters: comma-joined."""
+    event = api_event("GET /animals")
+    if statuses:
+        event["rawQueryString"] = "&".join(f"status={s}" for s in statuses)
+        event["queryStringParameters"] = {"status": ",".join(statuses)}
+    return event
+
+
+def numbers_from_api_response(event):
+    response = h.handler(event, None)
+    assert response["statusCode"] == 200
+    return [a["number"] for a in json.loads(response["body"])["animals"]]
+
+
+@pytest.fixture
+def mixed_herd(table):
+    put_animal(table, "A", number="3", status="active")
+    put_animal(table, "B", number="1", status="sold")
+    put_animal(table, "C", number="2", status="deceased")
+    put_animal(table, "D", number="4", status="external", date_of_birth=None)
+    return table
+
+
+def test_list_animals_without_status_excludes_external_and_sorts_by_number(mixed_herd):
+    assert numbers_from_api_response(generate_get_animals_api_event()) == ["1", "2", "3"]
+
+
+def test_list_animals_filters_by_single_status(mixed_herd):
+    assert numbers_from_api_response(generate_get_animals_api_event("sold")) == ["1"]
+
+
+def test_list_animals_filters_by_multiple_statuses_sorted_by_number(mixed_herd):
+    assert numbers_from_api_response(generate_get_animals_api_event("active", "sold")) == ["1", "3"]
+
+
+def test_list_animals_external_status_is_opt_in(mixed_herd):
+    assert numbers_from_api_response(generate_get_animals_api_event("external")) == ["4"]
+    assert numbers_from_api_response(generate_get_animals_api_event("active", "external")) == ["3", "4"]
+
+
+def test_list_animals_duplicate_statuses_do_not_duplicate_animals(mixed_herd):
+    assert numbers_from_api_response(generate_get_animals_api_event("active", "active")) == ["3"]
+
+
+def test_list_animals_unknown_status_returns_400(mixed_herd):
+    response = h.handler(generate_get_animals_api_event("archived"), None)
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [e["loc"][:2] for e in errors] == [["query", "status"]]
+
+
+def test_list_animals_status_filter_ignores_events(table):
+    put_animal(table, ULID)
+    h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps(EVENT_BODY)), None)
+
+    assert numbers_from_api_response(generate_get_animals_api_event("active")) == ["101"]
+
+
+def test_list_animals_pages_through_each_status(table, monkeypatch):
+    for i in range(3):
+        put_animal(table, str(i), number=str(i))
+    real_query = table.query
+    monkeypatch.setattr(table, "query", lambda **kw: real_query(**kw, Limit=1))
+    monkeypatch.setattr(routes, "get_ddb_table", lambda: table)
+
+    assert numbers_from_api_response(generate_get_animals_api_event("active")) == ["0", "1", "2"]
 
 
 EVENT_BODY = {"type": "vaccination", "date": "2024-05-01", "notes": "annual booster"}
