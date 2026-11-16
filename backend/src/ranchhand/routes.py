@@ -71,10 +71,43 @@ def invalid_request(exc: RequestValidationError):
     )
 
 
+# The sex each parent field must refer to.
+PARENT_SEX = {"sire_id": "male", "dam_id": "female"}
+
+
+def invalid_parent_errors(dynamodb_table, animal_in: AnimalIn) -> list[dict]:
+    """Return a validation error for each of sire_id/dam_id that is not an existing animal of the right sex."""
+    errors = []
+
+    for field, sex in PARENT_SEX.items():
+        parent_id = getattr(animal_in, field)
+        if parent_id is None:
+            continue
+
+        item = dynamodb_table.get_item(Key={"pk": f"ANIMAL#{parent_id}", "sk": "PROFILE"}).get("Item")
+
+        if item is None:
+            msg = f"No animal with id {parent_id}"
+        elif item["sex"] != sex:
+            msg = f"Animal {parent_id} is not {sex}"
+        else:
+            continue
+
+        errors.append({"type": "value_error", "loc": ["body", field], "msg": msg})
+
+    return errors
+
+
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
     dynamodb_table = get_ddb_table()
+
+    # The new animal's id is generated here, so it can never be its own parent.
+    if errors := invalid_parent_errors(dynamodb_table, animal_in):
+        # Handled by invalid_request(), so these look like any other validation failure.
+        raise RequestValidationError(errors)
+
     animal = Animal(**animal_in.model_dump())
 
     db_record = {
