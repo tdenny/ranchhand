@@ -6,6 +6,7 @@ from moto import mock_aws
 
 from ranchhand import handler as h
 from ranchhand import models, routes
+from ranchhand.repository import HerdRepository, get_repository
 
 BODY = {"number": "101", "status": "active", "sex": "female", "date_of_birth": "2020-04-01"}
 PARENTS_UNSET = {"sire_id": None, "dam_id": None}
@@ -40,7 +41,7 @@ def table(monkeypatch):
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test")
     monkeypatch.setattr(models, "new_ulid", lambda: ULID)
     with mock_aws():
-        yield boto3.resource("dynamodb").create_table(
+        table = boto3.resource("dynamodb").create_table(
             TableName="ranchhand-herd",
             BillingMode="PAY_PER_REQUEST",
             KeySchema=[
@@ -69,6 +70,12 @@ def table(monkeypatch):
                 )
             ],
         )
+        # The repository is cached for warm Lambdas; make sure it binds to this test's table.
+        get_repository.cache_clear()
+        try:
+            yield table
+        finally:
+            get_repository.cache_clear()
 
 
 def test_create_animal_writes_profile_item(table):
@@ -225,6 +232,15 @@ def test_create_animal_invalid_date_of_birth_returns_400_without_writing(table):
     assert table.scan()["Items"] == []
 
 
+def test_get_repository_is_shared_until_cleared(table):
+    assert get_repository() is get_repository()
+
+    first = get_repository()
+    get_repository.cache_clear()
+
+    assert get_repository() is not first
+
+
 def test_unknown_route_returns_404():
     response = h.handler(api_event("GET /nope"), None)
 
@@ -355,7 +371,7 @@ def test_list_animals_pages_through_each_status(table, monkeypatch):
         put_animal(table, str(i), number=str(i))
     real_query = table.query
     monkeypatch.setattr(table, "query", lambda **kw: real_query(**kw, Limit=1))
-    monkeypatch.setattr(routes, "get_ddb_table", lambda: table)
+    monkeypatch.setattr(routes, "get_repository", lambda: HerdRepository(table))
 
     assert numbers_from_api_response(generate_get_animals_api_event("active")) == ["0", "1", "2"]
 

@@ -2,9 +2,6 @@ import hmac
 import os
 from typing import Annotated, get_args
 
-import boto3
-from boto3.dynamodb.conditions import Key
-
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig, Response
 from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
@@ -12,6 +9,7 @@ from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValida
 from aws_lambda_powertools.event_handler.openapi.params import Query
 
 from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn, EventList, Status
+from ranchhand.repository import get_repository
 
 # A little awkward for now, but browsers send a credential-less preflight
 # before the Authorization header; allow only the configured frontend origin.
@@ -49,11 +47,6 @@ def require_token(app: APIGatewayHttpResolver, next_middleware: NextMiddleware) 
 app.use(middlewares=[require_token])
 
 
-def get_ddb_table():
-    """Return the herd DynamoDB table resource."""
-    return boto3.resource("dynamodb").Table("ranchhand-herd")
-
-
 @app.exception_handler(RequestValidationError)
 def invalid_request(exc: RequestValidationError):
     # Validation runs before middleware; don't describe the schema to unauthenticated callers.
@@ -75,8 +68,9 @@ def invalid_request(exc: RequestValidationError):
 PARENT_SEX = {"sire_id": "male", "dam_id": "female"}
 
 
-def invalid_parent_errors(dynamodb_table, animal_in: AnimalIn) -> list[dict]:
+def invalid_parent_errors(animal_in: AnimalIn) -> list[dict]:
     """Return a validation error for each of sire_id/dam_id that is not an existing animal of the right sex."""
+    repo = get_repository()
     errors = []
 
     for field, sex in PARENT_SEX.items():
@@ -84,11 +78,11 @@ def invalid_parent_errors(dynamodb_table, animal_in: AnimalIn) -> list[dict]:
         if parent_id is None:
             continue
 
-        item = dynamodb_table.get_item(Key={"pk": f"ANIMAL#{parent_id}", "sk": "PROFILE"}).get("Item")
+        parent = repo.get_animal(parent_id)
 
-        if item is None:
+        if parent is None:
             msg = f"No animal with id {parent_id}"
-        elif item["sex"] != sex:
+        elif parent.sex != sex:
             msg = f"Animal {parent_id} is not {sex}"
         else:
             continue
@@ -101,24 +95,13 @@ def invalid_parent_errors(dynamodb_table, animal_in: AnimalIn) -> list[dict]:
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
-    dynamodb_table = get_ddb_table()
-
     # The new animal's id is generated here, so it can never be its own parent.
-    if errors := invalid_parent_errors(dynamodb_table, animal_in):
+    if errors := invalid_parent_errors(animal_in):
         # Handled by invalid_request(), so these look like any other validation failure.
         raise RequestValidationError(errors)
 
     animal = Animal(**animal_in.model_dump())
-
-    db_record = {
-        "pk": f"ANIMAL#{animal.id}",
-        "sk": "PROFILE",
-        "entity": "animal",
-        # Omit unset sire_id/dam_id: a NULL value is invalid for a GSI key attribute.
-        **animal.model_dump(mode="json", exclude_none=True),
-    }
-
-    dynamodb_table.put_item(Item=db_record, ConditionExpression="attribute_not_exists(pk)")
+    get_repository().put_animal(animal)
 
     return Response(
         status_code=201,
@@ -134,64 +117,36 @@ def list_animals(status: Annotated[list[Status] | None, Query()] = None) -> Resp
 
     Without a status filter, every animal except external ones is returned.
     """
-    dynamodb_table = get_ddb_table()
-    statuses = list(dict.fromkeys(status)) if status else [s for s in get_args(Status) if s != "external"]
-    items = []
-
-    for animal_status in statuses:
-        query_kwargs = {"IndexName": "status-index", "KeyConditionExpression": Key("status").eq(animal_status)}
-
-        while True:
-            page = dynamodb_table.query(**query_kwargs)
-            items.extend(page["Items"])
-            if "LastEvaluatedKey" not in page:
-                break
-            query_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
-
-    items.sort(key=lambda item: item["number"])
+    statuses = status or [s for s in get_args(Status) if s != "external"]
 
     return Response(
         status_code=200,
         content_type="application/json",
-        body=AnimalList(animals=items),
+        body=AnimalList(animals=get_repository().list_animals(statuses)),
     )
 
 
 @app.get("/animals/<animal_id>")
 def get_animal(animal_id: str) -> Response[Animal]:
     """Return a single animal profile."""
-    dynamodb_table = get_ddb_table()
-    item = dynamodb_table.get_item(Key={"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}).get("Item")
+    animal = get_repository().get_animal(animal_id)
 
-    if item is None:
+    if animal is None:
         raise NotFoundError(f"Animal {animal_id} not found")
 
-    return Response(
-        status_code=200,
-        content_type="application/json",
-        body=Animal.model_validate(item),
-    )
+    return Response(status_code=200, content_type="application/json", body=animal)
 
 
 @app.post("/animals/<animal_id>/events")
 def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
     """Write a new event for an existing animal to the herd table."""
-    dynamodb_table = get_ddb_table()
-    profile_key = {"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}
+    repo = get_repository()
 
-    if dynamodb_table.get_item(Key=profile_key).get("Item") is None:
+    if not repo.animal_exists(animal_id):
         raise NotFoundError(f"Animal {animal_id} not found")
 
     event = Event(animal_id=animal_id, **event_in.model_dump())
-
-    db_record = {
-        "pk": f"ANIMAL#{animal_id}",
-        "sk": f"EVENT#{event.id}",
-        "entity": "event",
-        **event.model_dump(mode="json"),
-    }
-
-    dynamodb_table.put_item(Item=db_record, ConditionExpression="attribute_not_exists(pk)")
+    repo.put_event(event)
 
     return Response(
         status_code=201,
@@ -204,28 +159,13 @@ def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
 @app.get("/animals/<animal_id>/events")
 def list_animal_events(animal_id: str) -> Response[EventList]:
     """Return an animal's events, newest first."""
-    dynamodb_table = get_ddb_table()
-    profile_key = {"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE"}
+    repo = get_repository()
 
-    if dynamodb_table.get_item(Key=profile_key).get("Item") is None:
+    if not repo.animal_exists(animal_id):
         raise NotFoundError(f"Animal {animal_id} not found")
-
-    # Event sort keys are ULIDs, so key order is chronological.
-    query_kwargs = {
-        "KeyConditionExpression": Key("pk").eq(f"ANIMAL#{animal_id}") & Key("sk").begins_with("EVENT#"),
-        "ScanIndexForward": False,
-    }
-    items = []
-
-    while True:
-        page = dynamodb_table.query(**query_kwargs)
-        items.extend(page["Items"])
-        if "LastEvaluatedKey" not in page:
-            break
-        query_kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
 
     return Response(
         status_code=200,
         content_type="application/json",
-        body=EventList(events=items),
+        body=EventList(events=repo.list_events(animal_id)),
     )
