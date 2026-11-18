@@ -6,6 +6,23 @@
   --accent: #2f6b3a;
   --error: #a32020;
   color-scheme: light;
+
+  /* Theme for Choices.js (the sire/dam pickers); see choices.min.css for the variables. */
+  --choices-guttering: 0;
+  --choices-bg-color: #fff;
+  --choices-bg-color-dropdown: #fff;
+  --choices-keyline-color: #bbb;
+  --choices-base-border: 1px solid;
+  --choices-border-radius: 0.5rem;
+  --choices-input-height: 2.75rem;
+  --choices-inner-padding: 0.35rem 0.5rem;
+  --choices-font-size-lg: 1rem;
+  --choices-font-size-md: 1rem;
+  --choices-primary-color: var(--accent);
+  --choices-highlight-color: var(--accent);
+  --choices-highlighted-color: #e4efe6;
+  --choices-text-color: var(--text);
+  --choices-z-index: 2;
 }
 
 * { box-sizing: border-box; }
@@ -123,3 +140,10 @@ dd { margin: 0; }
 
 #events-status { color: var(--muted); }
 #events-status.error { color: var(--error); }
+
+.field { display: grid; gap: 0.25rem; }
+
+/* Our generic form rules are for plain inputs; keep them off the controls Choices builds. */
+.choices__input { min-height: 0; padding: 0.5rem; border-radius: 0.25rem; }
+.choices__list--dropdown .choices__item { color: var(--text); }
+.choices__description { margin-left: 0.5rem; color: var(--muted); font-size: 0.9rem; }

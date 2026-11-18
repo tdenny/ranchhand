@@ -91,9 +91,13 @@ Frontend
 --------
 
 The frontend in ``frontend/`` is plain HTML and ES modules with no build step.
-Modules do not load from ``file://``, so serve it on port 8080 (port 8000 is
-DynamoDB Local, and 8080 must match ``CORS_ALLOW_ORIGIN``)::
+Its one runtime dependency, Choices.js (the sire and dam pickers), is installed
+with npm and loaded straight from ``frontend/node_modules`` through an import
+map in ``index.html``, so run ``npm install`` once first. Modules do not load
+from ``file://``, so serve it on port 8080 (port 8000 is DynamoDB Local, and
+8080 must match ``CORS_ALLOW_ORIGIN``)::
 
+    (cd frontend && npm install)
     python3 -m http.server 8080 --directory frontend
 
 Open http://localhost:8080 and enter the API token when prompted (``local-token``
