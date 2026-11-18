@@ -4,7 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ranchhand</title>
+  <link rel="stylesheet" href="node_modules/choices.js/public/assets/styles/choices.min.css">
   <link rel="stylesheet" href="styles.css">
+  <!-- Lets js/parent-picker.js use a bare `import "choices.js"`, which Node resolves for the tests. -->
+  <script type="importmap">
+    { "imports": { "choices.js": "./node_modules/choices.js/public/assets/scripts/choices.mjs" } }
+  </script>
 </head>
 <body>
   <header>
@@ -34,12 +39,14 @@
       <label>Date of birth
         <input name="date_of_birth" type="date" required>
       </label>
-      <label>Sire
-        <input name="sire_id" autocomplete="off" placeholder="Animal ID or name">
-      </label>
-      <label>Dam
-        <input name="dam_id" autocomplete="off" placeholder="Animal ID or name">
-      </label>
+      <div class="field">
+        <label for="sire">Sire</label>
+        <select id="sire" name="sire_id"><option value="">None</option></select>
+      </div>
+      <div class="field">
+        <label for="dam">Dam</label>
+        <select id="dam" name="dam_id"><option value="">None</option></select>
+      </div>
       <button type="submit">Add animal</button>
       <p id="form-status" role="status"></p>
     </form>

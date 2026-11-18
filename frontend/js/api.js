@@ -61,8 +61,13 @@ async function request(path, { method = "GET", body } = {}) {
   return response.json();
 }
 
-export async function listAnimals() {
-  const { animals } = await request("/animals");
+// Every animal status the API knows; keep in sync with `Status` in backend/src/ranchhand/models.py.
+export const ALL_STATUSES = ["active", "deceased", "processed", "sold", "external"];
+
+// With no `statuses` the API returns every status except "external".
+export async function listAnimals({ statuses } = {}) {
+  const query = (statuses ?? []).map((status) => `status=${encodeURIComponent(status)}`).join("&");
+  const { animals } = await request(query ? `/animals?${query}` : "/animals");
   return animals;
 }
 
