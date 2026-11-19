@@ -32,21 +32,45 @@ function errorMessage(error, what) {
   return `Could not load ${what}. ${error.message}`;
 }
 
+function addDetail(label, value) {
+  const dt = document.createElement("dt");
+  dt.textContent = label;
+  const dd = document.createElement("dd");
+  if (typeof value === "string") dd.textContent = value;
+  else dd.append(value);
+  detailsEl.append(dt, dd);
+  return dd;
+}
+
+function parentLink(parent) {
+  const link = document.createElement("a");
+  link.href = `animal.html?id=${encodeURIComponent(parent.id)}`;
+  link.textContent = `#${parent.number}`;
+  return link;
+}
+
+// Show the sire or dam as a link by number. The profile only has the parent's id, so the number
+// is looked up after the profile is on screen; until then (or if the lookup fails) the row says so.
+async function addParent(label, parentId) {
+  const dd = addDetail(label, "Loading…");
+  try {
+    dd.replaceChildren(parentLink(await getAnimal(parentId)));
+  } catch (error) {
+    dd.textContent = error instanceof NotFoundError ? "Not found" : "Could not load";
+  }
+}
+
 function renderProfile(animal) {
   titleEl.textContent = `#${animal.number}`;
-  const fields = [
-    ["Sex", animal.sex],
-    ["Status", animal.status],
-    ["Date of birth", animal.date_of_birth],
-  ];
-  detailsEl.replaceChildren(...fields.flatMap(([label, value]) => {
-    const dt = document.createElement("dt");
-    dt.textContent = label;
-    const dd = document.createElement("dd");
-    dd.textContent = value;
-    return [dt, dd];
-  }));
+  detailsEl.replaceChildren();
+  addDetail("Sex", animal.sex);
+  addDetail("Status", animal.status);
+  addDetail("Date of birth", animal.date_of_birth ?? "Unknown");
   profileEl.hidden = false;
+
+  // Only the parents that are recorded get a row. Not awaited: they fill in as they arrive.
+  if (animal.sire_id) addParent("Sire", animal.sire_id);
+  if (animal.dam_id) addParent("Dam", animal.dam_id);
 }
 
 function eventItem(event) {
