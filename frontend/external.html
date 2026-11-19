@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>External animals · Ranchhand</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Ranchhand</h1>
+    <button id="token-button" type="button" class="link">Set token</button>
+  </header>
+  <main>
+    <p><a href="index.html">&larr; All animals</a></p>
+
+    <h2>Add external animal</h2>
+    <p class="hint">A sire or dam that isn't in the herd, such as a neighbor's bull or an AI straw. Once added, it can be picked as a parent when adding an animal.</p>
+    <form id="external-form">
+      <label>Name or ID
+        <input name="number" required autocomplete="off">
+      </label>
+      <label>Sex
+        <select name="sex" required>
+          <option value="male">Male (sire)</option>
+          <option value="female">Female (dam)</option>
+        </select>
+      </label>
+      <button type="submit">Add external animal</button>
+      <p id="form-status" role="status"></p>
+    </form>
+
+    <h2>External animals</h2>
+    <p id="status" role="status"></p>
+    <ul id="animal-list"></ul>
+  </main>
+  <script type="module" src="js/external.js"></script>
+</body>
+</html>
