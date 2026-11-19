@@ -147,3 +147,5 @@ dd { margin: 0; }
 .choices__input { min-height: 0; padding: 0.5rem; border-radius: 0.25rem; }
 .choices__list--dropdown .choices__item { color: var(--text); }
 .choices__description { margin-left: 0.5rem; color: var(--muted); font-size: 0.9rem; }
+
+.hint { color: var(--muted); font-size: 0.9rem; }
