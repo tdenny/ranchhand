@@ -41,7 +41,7 @@ before(async () => {
     return jsonResponse({ message: "Not found" }, 404);
   };
 
-  window = await loadPage("index.html", { fetchStub });
+  window = await loadPage("add.html", { fetchStub });
 });
 
 const $ = (selector) => window.document.querySelector(selector);
