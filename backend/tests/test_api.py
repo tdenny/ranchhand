@@ -389,7 +389,7 @@ def test_list_animals_pages_through_each_status(table, monkeypatch):
     assert numbers_from_api_response(generate_get_animals_api_event("active")) == ["0", "1", "2"]
 
 
-EVENT_BODY = {"type": "vaccination", "date": "2024-05-01", "notes": "annual booster"}
+EVENT_BODY = {"type": "note", "date": "2024-05-01", "notes": "annual booster"}
 
 
 def test_create_animal_event_writes_event_item(table):
@@ -434,6 +434,30 @@ def test_create_animal_event_invalid_body_returns_400(table):
     )
 
     assert response["statusCode"] == 400
+
+
+@pytest.mark.parametrize("event_type", ["castrated", "bred", "calved", "weaned", "note"])
+def test_create_animal_event_accepts_each_type(table, event_type):
+    h.handler(api_event(body=json.dumps(BODY)), None)
+    body = {**EVENT_BODY, "type": event_type}
+
+    response = h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps(body)), None)
+
+    assert response["statusCode"] == 201
+    assert json.loads(response["body"])["type"] == event_type
+
+
+@pytest.mark.parametrize("event_type", ["vaccination", "Note", "", "castrate"])
+def test_create_animal_event_unknown_type_returns_400_without_writing(table, event_type):
+    h.handler(api_event(body=json.dumps(BODY)), None)
+    body = {**EVENT_BODY, "type": event_type}
+
+    response = h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps(body)), None)
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [e["loc"] for e in errors] == [["body", "type"]]
+    assert [i["sk"] for i in table.scan()["Items"]] == ["PROFILE"]
 
 
 @pytest.mark.parametrize(
@@ -535,9 +559,9 @@ def put_event(table, animal_id, event_id, **fields):
 
 def test_list_animal_events_returns_events_newest_first(table):
     h.handler(api_event(body=json.dumps(BODY)), None)
-    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA1", type="vaccination")
-    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA3", type="weighing")
-    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA2", type="treatment")
+    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA1", type="note")
+    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA3", type="calved")
+    put_event(table, ULID, "01ARZ3NDEKTSV4RRFFQ69G5FA2", type="bred")
 
     response = h.handler(api_event(f"GET /animals/{ULID}/events"), None)
 
@@ -551,7 +575,7 @@ def test_list_animal_events_returns_events_newest_first(table):
     assert events[0] == {
         "id": "01ARZ3NDEKTSV4RRFFQ69G5FA3",
         "animal_id": ULID,
-        **{**EVENT_BODY, "type": "weighing"},
+        **{**EVENT_BODY, "type": "calved"},
     }
 
 

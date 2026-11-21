@@ -5,8 +5,8 @@ import { jsonResponse, loadPage, waitFor } from "./dom.js";
 
 const ANIMAL = { id: "01AAA", number: "101", sex: "female", status: "active", date_of_birth: "2022-04-01", category: "Cow" };
 const EVENTS = [
-  { id: "01E2", animal_id: "01AAA", type: "weighing", date: "2024-06-01", notes: "540 lb" },
-  { id: "01E1", animal_id: "01AAA", type: "vaccination", date: "2024-05-01", notes: null },
+  { id: "01E2", animal_id: "01AAA", type: "calved", date: "2024-06-01", notes: "540 lb" },
+  { id: "01E1", animal_id: "01AAA", type: "note", date: "2024-05-01", notes: null },
 ];
 
 const calls = [];
@@ -50,27 +50,27 @@ test("the detail page shows the animal and its events, newest first", async () =
   );
   assert.deepEqual(
     eventItems().map((item) => item.textContent),
-    ["weighing2024-06-01540 lb", "vaccination2024-05-01"],
+    ["Calved2024-06-01540 lb", "Note2024-05-01"],
   );
   assert.equal($("#status").textContent, "");
 });
 
-test("logging an event posts the trimmed form values and adds the event to the top of the list", async () => {
+test("adding a note posts a note event with the trimmed notes and adds the event to the top of the list", async () => {
   const form = $("#event-form");
   assert.equal(form.elements.date.value, new Date().toLocaleDateString("en-CA"));
 
-  form.elements.type.value = "treatment";
   form.elements.date.value = "2024-07-01";
   form.elements.notes.value = "  pinkeye  ";
   form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
 
-  await waitFor(() => $("#form-status").textContent === "Logged treatment.", "success message");
+  await waitFor(() => $("#form-status").textContent === "Note added.", "success message");
 
   const post = calls.find(({ method }) => method === "POST");
   assert.equal(post.pathname, "/animals/01AAA/events");
-  assert.deepEqual(post.body, { type: "treatment", date: "2024-07-01", notes: "pinkeye" });
+  assert.deepEqual(post.body, { type: "note", date: "2024-07-01", notes: "pinkeye" });
 
   assert.equal(eventItems().length, EVENTS.length + 1);
-  assert.equal(eventItems()[0].textContent, "treatment2024-07-01pinkeye");
-  assert.equal(form.elements.type.value, "", "the form is cleared after saving");
+  assert.equal(eventItems()[0].textContent, "Note2024-07-01pinkeye");
+  assert.equal(form.elements.notes.value, "", "the form is cleared after saving");
+  assert.equal("type" in form.elements, false, "there is no type to choose");
 });
