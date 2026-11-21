@@ -20,6 +20,24 @@ class AnimalIn(BaseModel):
     date_of_birth: date | None = Field(default=None, validate_default=True)
     sire_id: str | None = None
     dam_id: str | None = None
+    castrated: bool = False
+    bred: bool = False
+
+    @field_validator("castrated")
+    @classmethod
+    def castrated_only_for_males(cls, value: bool, info: ValidationInfo) -> bool:
+        # info.data only holds fields validated before this one, so this relies on `sex` being declared
+        # above `castrated`; if sex itself failed validation it is absent and that error is already reported.
+        if value and info.data.get("sex") == "female":
+            raise ValueError("Only male animals can be castrated")
+        return value
+
+    @field_validator("bred")
+    @classmethod
+    def bred_only_for_females(cls, value: bool, info: ValidationInfo) -> bool:
+        if value and info.data.get("sex") == "male":
+            raise ValueError("Only female animals can be bred")
+        return value
 
     @field_validator("sire_id", "dam_id")
     @classmethod
