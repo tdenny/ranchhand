@@ -48,7 +48,8 @@ class HerdRepository:
             **animal_key(animal.id),
             "entity": "animal",
             # Omit unset sire_id/dam_id: a NULL value is invalid for a GSI key attribute.
-            **animal.model_dump(mode="json", exclude_none=True),
+            # category is derived from the age on each read, so storing it would let it go stale.
+            **animal.model_dump(mode="json", exclude_none=True, exclude={"category"}),
         }
         self._table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
 

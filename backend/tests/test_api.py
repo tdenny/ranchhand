@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 import boto3
 import pytest
@@ -11,6 +12,9 @@ from ranchhand.repository import HerdRepository, get_repository
 BODY = {"number": "101", "status": "active", "sex": "female", "date_of_birth": "2020-04-01"}
 PARENTS_UNSET = {"sire_id": None, "dam_id": None}
 FLAGS_UNSET = {"castrated": False, "bred": False}
+TODAY = date(2026, 11, 21)
+# What BODY (a cow-aged female not yet bred) is called on TODAY.
+CATEGORY = {"category": "Heifer"}
 ULID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 TOKEN = "test-token"
 
@@ -18,6 +22,11 @@ TOKEN = "test-token"
 @pytest.fixture(autouse=True)
 def api_token(monkeypatch):
     monkeypatch.setenv("API_TOKEN", TOKEN)
+
+
+@pytest.fixture(autouse=True)
+def fixed_today(monkeypatch):
+    monkeypatch.setattr(models, "today", lambda: TODAY)
 
 
 def api_event(route_key="POST /animals", **fields):
@@ -99,7 +108,7 @@ def test_create_animal_returns_201_with_created_animal(table):
     assert response["statusCode"] == 201
     assert response["headers"]["Content-Type"] == "application/json"
     assert response["headers"]["location"] == f"/animals/{ULID}"
-    assert json.loads(response["body"]) == {"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET}
+    assert json.loads(response["body"]) == {"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY}
 
 
 @pytest.mark.parametrize(
@@ -264,8 +273,8 @@ def test_list_animals_returns_all_animals(table):
 
     assert response["statusCode"] == 200
     assert sorted(json.loads(response["body"])["animals"], key=lambda a: a["id"]) == [
-        {"id": "0", **BODY, **PARENTS_UNSET, **FLAGS_UNSET},
-        {"id": "1", **other, **PARENTS_UNSET, **FLAGS_UNSET},
+        {"id": "0", **BODY, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY},
+        {"id": "1", **other, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY},
     ]
 
 
@@ -277,7 +286,7 @@ def test_get_animal_returns_animal(table):
     response = h.handler(api_event(f"GET /animals/{ULID}"), None)
 
     assert response["statusCode"] == 200
-    assert json.loads(response["body"]) == {"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET}
+    assert json.loads(response["body"]) == {"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY}
 
 
 def test_get_animal_unknown_id_returns_404(table):
@@ -301,7 +310,7 @@ def test_list_animals_omits_table_attributes(table):
 
     response = h.handler(api_event("GET /animals"), None)
 
-    assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET}]}
+    assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY}]}
 
 
 def put_animal(table, animal_id, **fields):
