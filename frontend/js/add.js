@@ -28,6 +28,19 @@ function loadCandidates() {
 setupParentPicker(document.querySelector("#sire"), { sex: "male", loadCandidates });
 setupParentPicker(document.querySelector("#dam"), { sex: "female", loadCandidates });
 
+// Only males can be castrated and only females bred, so show whichever applies to the chosen sex.
+// A hidden box is cleared so a tick left over from the other sex is never submitted.
+function showFlagFields() {
+  const isMale = formEl.elements.sex.value === "male";
+  for (const [id, applies] of [["castrated", isMale], ["bred", !isMale]]) {
+    document.querySelector(`#${id}-field`).hidden = !applies;
+    if (!applies) formEl.elements[id].checked = false;
+  }
+}
+
+formEl.elements.sex.addEventListener("change", showFlagFields);
+showFlagFields();
+
 function showStatus(message, isError = false) {
   formStatusEl.textContent = message;
   formStatusEl.classList.toggle("error", isError);
@@ -46,9 +59,16 @@ formEl.addEventListener("submit", async (event) => {
   showStatus("Saving…");
 
   try {
-    const animal = await createAnimal(Object.fromEntries(new FormData(formEl)));
+    // An unchecked box is left out of the form data, and the API treats a missing flag as false.
+    const { castrated, bred, ...fields } = Object.fromEntries(new FormData(formEl));
+    const animal = await createAnimal({
+      ...fields,
+      ...(castrated && { castrated: true }),
+      ...(bred && { bred: true }),
+    });
     candidates = null; // the new animal can be a parent from now on
     formEl.reset();
+    showFlagFields(); // reset puts the sex back to its default without firing a change event
     showStatus(`Added #${animal.number}.`, false);
   } catch (error) {
     let message = `Could not add the animal. ${error.message}`;

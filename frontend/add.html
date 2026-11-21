@@ -49,6 +49,14 @@
         <label for="dam">Dam</label>
         <select id="dam" name="dam_id"><option value="">None</option></select>
       </div>
+      <label class="check" id="castrated-field" hidden>
+        <input name="castrated" type="checkbox">
+        Already castrated
+      </label>
+      <label class="check" id="bred-field">
+        <input name="bred" type="checkbox">
+        Already bred
+      </label>
       <button type="submit">Add animal</button>
       <p id="form-status" role="status"></p>
     </form>
