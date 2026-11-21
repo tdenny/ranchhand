@@ -1,13 +1,30 @@
 from datetime import date
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 from ranchhand.ulid import new_ulid
 
 
 Status = Literal["active", "deceased", "processed", "sold", "external"]
 Sex = Literal["female", "male"]
+Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf"]
+
+CALF_YEARS = 2
+
+
+def today() -> date:
+    # A function so tests can patch it.
+    return date.today()
+
+
+def is_calf(date_of_birth: date, mature_on: date) -> bool:
+    """Whether an animal born on date_of_birth is under CALF_YEARS old on the given date."""
+    return (mature_on.year - CALF_YEARS, mature_on.month, mature_on.day) < (
+        date_of_birth.year,
+        date_of_birth.month,
+        date_of_birth.day,
+    )
 
 
 class AnimalIn(BaseModel):
@@ -44,6 +61,18 @@ class Animal(AnimalIn):
 
     # The lambda looks up new_ulid at call time so tests can patch it.
     id: str = Field(default_factory=lambda: new_ulid())
+
+    @computed_field
+    @property
+    def category(self) -> Category | None:
+        """What the animal is called now; None when the age is unknown. Derived on read, never stored."""
+        if self.date_of_birth is None:
+            return None
+        if is_calf(self.date_of_birth, today()):
+            return "Bull calf" if self.sex == "male" else "Heifer calf"
+        if self.sex == "male":
+            return "Steer" if self.castrated else "Bull"
+        return "Cow" if self.bred else "Heifer"
 
 
 class AnimalList(BaseModel):
