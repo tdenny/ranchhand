@@ -3,7 +3,7 @@ import { before, test } from "node:test";
 
 import { jsonResponse, loadPage, waitFor } from "./dom.js";
 
-const ANIMAL = { id: "01AAA", number: "101", sex: "female", status: "active", date_of_birth: "2022-04-01" };
+const ANIMAL = { id: "01AAA", number: "101", sex: "female", status: "active", date_of_birth: "2022-04-01", category: "Cow" };
 const EVENTS = [
   { id: "01E2", animal_id: "01AAA", type: "weighing", date: "2024-06-01", notes: "540 lb" },
   { id: "01E1", animal_id: "01AAA", type: "vaccination", date: "2024-05-01", notes: null },
@@ -46,7 +46,7 @@ test("the detail page shows the animal and its events, newest first", async () =
   const values = [...window.document.querySelectorAll("#profile-details dd")].map((dd) => dd.textContent);
   assert.deepEqual(
     Object.fromEntries(labels.map((label, i) => [label, values[i]])),
-    { Sex: "female", Status: "active", "Date of birth": "2022-04-01" },
+    { Category: "Cow", Sex: "female", Status: "active", "Date of birth": "2022-04-01" },
   );
   assert.deepEqual(
     eventItems().map((item) => item.textContent),
