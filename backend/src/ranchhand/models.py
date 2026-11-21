@@ -8,6 +8,8 @@ from ranchhand.ulid import new_ulid
 
 Status = Literal["active", "deceased", "processed", "sold", "external"]
 Sex = Literal["female", "male"]
+# Milestones change an animal's state ("note" is a plain log entry that doesn't).
+EventType = Literal["castrated", "bred", "calved", "weaned", "note"]
 Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf"]
 
 CALF_YEARS = 2
@@ -84,7 +86,7 @@ class AnimalList(BaseModel):
 class EventIn(BaseModel):
     """Request body for POST /animals/<animal_id>/events."""
 
-    type: str
+    type: EventType
     date: date
     notes: str | None = None
 

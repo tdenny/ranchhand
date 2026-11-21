@@ -80,7 +80,7 @@ function eventItem(event) {
 
   const heading = document.createElement("div");
   heading.className = "number";
-  heading.textContent = event.type;
+  heading.textContent = event.type[0].toUpperCase() + event.type.slice(1);
 
   const details = document.createElement("div");
   details.className = "details";
@@ -159,15 +159,16 @@ formEl.addEventListener("submit", async (submitEvent) => {
   submitButton.disabled = true;
   showStatus(formStatusEl, "Saving…");
 
-  const { type, date, notes } = Object.fromEntries(new FormData(formEl));
+  const { date, notes } = Object.fromEntries(new FormData(formEl));
 
   try {
-    const event = await createEvent(animalId, { type, date, notes: notes.trim() || null });
+    // This form only adds plain notes; milestones such as castration are recorded another way.
+    const event = await createEvent(animalId, { type: "note", date, notes: notes.trim() || null });
     // The list is newest first, so the new event goes on top.
     eventListEl.prepend(eventItem(event));
     showStatus(eventsStatusEl, "");
     resetForm();
-    showStatus(formStatusEl, `Logged ${event.type}.`);
+    showStatus(formStatusEl, "Note added.");
   } catch (error) {
     let message = `Could not log the event. ${error.message}`;
     if (error instanceof UnauthorizedError) {
