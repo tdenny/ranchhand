@@ -1,7 +1,7 @@
 from datetime import date
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ranchhand.ulid import new_ulid
 
@@ -16,28 +16,11 @@ class AnimalIn(BaseModel):
     number: str
     status: Status
     sex: Sex
-    # validate_default so the validator below also runs when the field is omitted.
-    date_of_birth: date | None = Field(default=None, validate_default=True)
+    date_of_birth: date | None = None
     sire_id: str | None = None
     dam_id: str | None = None
     castrated: bool = False
     bred: bool = False
-
-    @field_validator("castrated")
-    @classmethod
-    def castrated_only_for_males(cls, value: bool, info: ValidationInfo) -> bool:
-        # info.data only holds fields validated before this one, so this relies on `sex` being declared
-        # above `castrated`; if sex itself failed validation it is absent and that error is already reported.
-        if value and info.data.get("sex") == "female":
-            raise ValueError("Only male animals can be castrated")
-        return value
-
-    @field_validator("bred")
-    @classmethod
-    def bred_only_for_females(cls, value: bool, info: ValidationInfo) -> bool:
-        if value and info.data.get("sex") == "male":
-            raise ValueError("Only female animals can be bred")
-        return value
 
     @field_validator("sire_id", "dam_id")
     @classmethod
@@ -45,16 +28,15 @@ class AnimalIn(BaseModel):
         # These are GSI keys (see infra/dynamodb.tf); DynamoDB rejects empty strings for them.
         return value.strip() or None if value is not None else None
 
-    @field_validator("date_of_birth")
-    @classmethod
-    def require_date_of_birth_unless_external(cls, value: date | None, info: ValidationInfo) -> date | None:
-        # External animals often have no known birth date.
-        # info.data only holds fields validated before this one, so this relies on `status` being
-        # declared above `date_of_birth`; reordering them silently disables the check.
-        # If status itself failed validation it is absent from info.data; that error is already reported.
-        if value is None and "status" in info.data and info.data["status"] != "external":
-            raise ValueError("Field required for animals that are not external")
-        return value
+    @model_validator(mode="after")
+    def check_field_combinations(self) -> Self:
+        if self.date_of_birth is None and self.status != "external":
+            raise ValueError("date_of_birth is required for animals that are not external")
+        if self.castrated and self.sex == "female":
+            raise ValueError("Only male animals can be castrated")
+        if self.bred and self.sex == "male":
+            raise ValueError("Only female animals can be bred")
+        return self
 
 
 class Animal(AnimalIn):

@@ -198,7 +198,9 @@ def test_create_animal_missing_date_of_birth_returns_400_unless_external(table, 
 
     assert response["statusCode"] == 400
     errors = json.loads(response["body"])["errors"]
-    assert [e["loc"] for e in errors] == [["body", "date_of_birth"]]
+    assert [(e["loc"], e["msg"]) for e in errors] == [
+        (["body"], "Value error, date_of_birth is required for animals that are not external")
+    ]
     assert table.scan()["Items"] == []
 
 
@@ -680,7 +682,7 @@ def test_create_animal_flag_for_wrong_sex_returns_400_without_writing(table, sex
 
     assert response["statusCode"] == 400
     errors = json.loads(response["body"])["errors"]
-    assert [(e["loc"], e["msg"]) for e in errors] == [(["body", flag], f"Value error, {msg}")]
+    assert [(e["loc"], e["msg"]) for e in errors] == [(["body"], f"Value error, {msg}")]
     assert table.scan()["Items"] == []
 
 
