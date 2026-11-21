@@ -6,7 +6,7 @@ import { jsonResponse, loadPage, waitFor } from "./dom.js";
 // An external animal (no date of birth) whose sire resolves and whose dam can't be found.
 const ANIMAL = {
   id: "01AAA", number: "Straw 7", sex: "male", status: "external", date_of_birth: null,
-  sire_id: "01SIRE", dam_id: "01DAM",
+  sire_id: "01SIRE", dam_id: "01DAM", category: null,
 };
 const SIRE = { id: "01SIRE", number: "201", sex: "male", status: "deceased", date_of_birth: "2015-02-10" };
 
@@ -32,6 +32,12 @@ const details = () => {
 test("an unknown date of birth reads Unknown, not null", async () => {
   await waitFor(() => details()["Date of birth"], "profile");
   assert.equal(details()["Date of birth"].textContent, "Unknown");
+});
+
+test("an animal without a category has no Category row", async () => {
+  await waitFor(() => details()["Date of birth"], "profile");
+  assert.equal("Category" in details(), false);
+  assert.equal(details().Sex.textContent, "male");
 });
 
 test("the sire is a link to its detail page, labelled by number", async () => {

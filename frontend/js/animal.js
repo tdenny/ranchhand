@@ -63,6 +63,8 @@ async function addParent(label, parentId) {
 function renderProfile(animal) {
   titleEl.textContent = `#${animal.number}`;
   detailsEl.replaceChildren();
+  // Unknown (null) when there is no date of birth, which is also when the sex stands in on the list.
+  if (animal.category) addDetail("Category", animal.category);
   addDetail("Sex", animal.sex);
   addDetail("Status", animal.status);
   addDetail("Date of birth", animal.date_of_birth ?? "Unknown");
