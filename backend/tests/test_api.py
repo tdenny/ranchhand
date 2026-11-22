@@ -2,32 +2,11 @@ import json
 
 import pytest
 from botocore.exceptions import ClientError
-from helpers import TOKEN, ULID
+from helpers import BODY, CATEGORY, FLAGS_UNSET, PARENTS_UNSET, TOKEN, ULID, api_event, put_animal
 
 from ranchhand import handler as h
 from ranchhand import models, routes
 from ranchhand.repository import HerdRepository, get_repository
-
-BODY = {"number": "101", "status": "active", "sex": "female", "date_of_birth": "2020-04-01"}
-PARENTS_UNSET = {"sire_id": None, "dam_id": None}
-FLAGS_UNSET = {"castrated": False, "bred": False}
-# What BODY (a cow-aged female not yet bred) is called on TODAY.
-CATEGORY = {"category": "Heifer"}
-
-
-def api_event(route_key="POST /animals", **fields):
-    """A minimal API Gateway HTTP API (v2) event; fields (e.g. body) are merged in."""
-    method, path = route_key.split(" ")
-    return {
-        "version": "2.0",
-        "routeKey": route_key,
-        "rawPath": path,
-        "rawQueryString": "",
-        "headers": {"content-type": "application/json", "authorization": f"Bearer {TOKEN}"},
-        "requestContext": {"stage": "$default", "http": {"method": method, "path": path}},
-        "isBase64Encoded": False,
-        **fields,
-    }
 
 
 def test_create_animal_writes_profile_item(table):
@@ -253,12 +232,6 @@ def test_list_animals_omits_table_attributes(table):
     response = h.handler(api_event("GET /animals"), None)
 
     assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY}]}
-
-
-def put_animal(table, animal_id, **fields):
-    """Store an animal; a field set to None is left out (as the API does for unset values)."""
-    item = {"pk": f"ANIMAL#{animal_id}", "sk": "PROFILE", "entity": "animal", "id": animal_id, **BODY, **fields}
-    table.put_item(Item={k: v for k, v in item.items() if v is not None})
 
 
 def generate_get_animals_api_event(*statuses):
