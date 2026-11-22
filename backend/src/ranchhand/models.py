@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Literal, Self
+from typing import Literal, NamedTuple, Self
 
 from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
@@ -11,6 +11,22 @@ Sex = Literal["female", "male"]
 # Milestones change an animal's state ("note" is a plain log entry that doesn't).
 EventType = Literal["castrated", "bred", "calved", "weaned", "note"]
 Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf"]
+
+
+class Milestone(NamedTuple):
+    """What recording a milestone event means: the sex it applies to and the animal flag it sets."""
+
+    sex: Sex
+    flag: Literal["castrated", "bred"]
+    error: str
+
+
+# Event types not listed here (weaned, note) apply to either sex and leave the animal unchanged.
+MILESTONES = {
+    "castrated": Milestone("male", "castrated", "Only male animals can be castrated"),
+    "bred": Milestone("female", "bred", "Only female animals can be bred"),
+    "calved": Milestone("female", "bred", "Only female animals can calve"),
+}
 
 CALF_YEARS = 2
 

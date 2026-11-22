@@ -8,7 +8,7 @@ from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 from aws_lambda_powertools.event_handler.openapi.params import Query
 
-from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn, EventList, Status
+from ranchhand.models import MILESTONES, Animal, AnimalIn, AnimalList, Event, EventIn, EventList, Status
 from ranchhand.repository import get_repository
 
 # A little awkward for now, but browsers send a credential-less preflight
@@ -141,9 +141,14 @@ def get_animal(animal_id: str) -> Response[Animal]:
 def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
     """Write a new event for an existing animal to the herd table."""
     repo = get_repository()
+    animal = repo.get_animal(animal_id)
 
-    if not repo.animal_exists(animal_id):
+    if animal is None:
         raise NotFoundError(f"Animal {animal_id} not found")
+
+    milestone = MILESTONES.get(event_in.type)
+    if milestone is not None and animal.sex != milestone.sex:
+        raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": milestone.error}])
 
     event = Event(animal_id=animal_id, **event_in.model_dump())
     repo.put_event(event)

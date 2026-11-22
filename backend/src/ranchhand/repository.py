@@ -6,7 +6,7 @@ from functools import cache
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from ranchhand.models import Animal, Event, Status
+from ranchhand.models import MILESTONES, Animal, Event, Status
 
 TABLE_NAME = "ranchhand-herd"
 STATUS_INDEX = "status-index"
@@ -66,14 +66,45 @@ class HerdRepository:
         return sorted((Animal.model_validate(item) for item in items), key=lambda animal: animal.number)
 
     def put_event(self, event: Event) -> None:
-        """Store a new event under its animal; raises ClientError if its id is already taken."""
+        """Store a new event under its animal; raises ClientError if its id is already taken.
+
+        A milestone event also sets its flag on the animal's profile, in the same transaction, so the
+        two can't disagree. That raises ClientError too (TransactionCanceledException) if the animal
+        doesn't exist.
+        """
         item = {
             "pk": f"ANIMAL#{event.animal_id}",
             "sk": f"EVENT#{event.id}",
             "entity": "event",
             **event.model_dump(mode="json"),
         }
-        self._table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+        milestone = MILESTONES.get(event.type)
+
+        if milestone is None:
+            self._table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+            return
+
+        self._table.meta.client.transact_write_items(
+            TransactItems=[
+                {
+                    "Put": {
+                        "TableName": self._table.name,
+                        "Item": item,
+                        "ConditionExpression": "attribute_not_exists(pk)",
+                    }
+                },
+                {
+                    "Update": {
+                        "TableName": self._table.name,
+                        "Key": animal_key(event.animal_id),
+                        "UpdateExpression": "SET #flag = :true",
+                        "ConditionExpression": "attribute_exists(pk)",
+                        "ExpressionAttributeNames": {"#flag": milestone.flag},
+                        "ExpressionAttributeValues": {":true": True},
+                    }
+                },
+            ]
+        )
 
     def list_events(self, animal_id: str) -> list[Event]:
         """Return an animal's events, newest first."""
