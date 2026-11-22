@@ -75,6 +75,11 @@ export function createAnimal(animal) {
   return request("/animals", { method: "POST", body: animal });
 }
 
+// Replaces every editable field, so `animal` must be the complete set (as for createAnimal).
+export function updateAnimal(id, animal) {
+  return request(`/animals/${encodeURIComponent(id)}`, { method: "PUT", body: animal });
+}
+
 export function getAnimal(id) {
   return request(`/animals/${encodeURIComponent(id)}`);
 }
