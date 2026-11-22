@@ -125,6 +125,7 @@ function renderProfile(animal) {
   addDetail("Sex", animal.sex);
   addDetail("Status", animal.status);
   addDetail("Date of birth", animal.date_of_birth ?? "Unknown");
+  document.querySelector("#edit-link").href = `edit.html?id=${encodeURIComponent(animal.id)}`;
   profileEl.hidden = false;
   renderMilestoneActions(animal);
 
