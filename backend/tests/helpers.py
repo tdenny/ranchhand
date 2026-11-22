@@ -9,6 +9,7 @@ PARENTS_UNSET = {"sire_id": None, "dam_id": None}
 FLAGS_UNSET = {"castrated": False, "bred": False}
 # What BODY (a cow-aged female not yet bred) is called on TODAY.
 CATEGORY = {"category": "Heifer"}
+EVENT_BODY = {"type": "note", "date": "2024-05-01", "notes": "annual booster"}
 
 
 def api_event(route_key="POST /animals", **fields):
