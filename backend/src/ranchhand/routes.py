@@ -92,6 +92,15 @@ def invalid_parent_errors(animal_in: AnimalIn) -> list[dict]:
     return errors
 
 
+# The sex each milestone event applies to, and the error when it's recorded for the other sex.
+# Event types not listed here (weaned, note) apply to either sex.
+EVENT_SEX_RULES = {
+    "castrated": ("male", "Only male animals can be castrated"),
+    "bred": ("female", "Only female animals can be bred"),
+    "calved": ("female", "Only female animals can calve"),
+}
+
+
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
@@ -141,9 +150,14 @@ def get_animal(animal_id: str) -> Response[Animal]:
 def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
     """Write a new event for an existing animal to the herd table."""
     repo = get_repository()
+    animal = repo.get_animal(animal_id)
 
-    if not repo.animal_exists(animal_id):
+    if animal is None:
         raise NotFoundError(f"Animal {animal_id} not found")
+
+    rule = EVENT_SEX_RULES.get(event_in.type)
+    if rule is not None and animal.sex != rule[0]:
+        raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": rule[1]}])
 
     event = Event(animal_id=animal_id, **event_in.model_dump())
     repo.put_event(event)
