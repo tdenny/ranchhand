@@ -42,16 +42,27 @@ class HerdRepository:
         item = self._table.get_item(Key=animal_key(animal_id), ProjectionExpression="pk").get("Item")
         return item is not None
 
-    def put_animal(self, animal: Animal) -> None:
-        """Store a new animal; raises ClientError if its id is already taken."""
-        item = {
+    @staticmethod
+    def _animal_item(animal: Animal) -> dict:
+        return {
             **animal_key(animal.id),
             "entity": "animal",
             # Omit unset sire_id/dam_id: a NULL value is invalid for a GSI key attribute.
             # category is derived from the age on each read, so storing it would let it go stale.
             **animal.model_dump(mode="json", exclude_none=True, exclude={"category"}),
         }
-        self._table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
+
+    def put_animal(self, animal: Animal) -> None:
+        """Store a new animal; raises ClientError if its id is already taken."""
+        self._table.put_item(Item=self._animal_item(animal), ConditionExpression="attribute_not_exists(pk)")
+
+    def replace_animal(self, animal: Animal) -> None:
+        """Overwrite an existing animal's profile; raises ClientError if there is no such animal.
+
+        The whole item is replaced, so a cleared sire_id/dam_id (omitted by _animal_item) is removed.
+        Events are separate items and are untouched.
+        """
+        self._table.put_item(Item=self._animal_item(animal), ConditionExpression="attribute_exists(pk)")
 
     def list_animals(self, statuses: Iterable[Status]) -> list[Animal]:
         """Return the animals with any of the given statuses, ordered by number."""
