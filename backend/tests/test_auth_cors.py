@@ -1,12 +1,11 @@
 import json
 
 import pytest
-from botocore.exceptions import ClientError
-from helpers import BODY, EVENT_BODY, TOKEN, ULID, api_event, put_animal
+from helpers import BODY, TOKEN, api_event
 
 from ranchhand import handler as h
-from ranchhand import models, routes
-from ranchhand.repository import HerdRepository, get_repository
+from ranchhand import routes
+from ranchhand.repository import get_repository
 
 
 def test_get_repository_is_shared_until_cleared(table):
