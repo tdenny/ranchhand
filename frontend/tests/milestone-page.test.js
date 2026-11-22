@@ -46,7 +46,7 @@ const profile = () => {
 test("an uncastrated male gets a Record castration button, and the form stays closed until it is clicked", async () => {
   await waitFor(() => actionButtons().length, "the action button");
 
-  assert.deepEqual(actionButtons().map((b) => b.textContent), ["Record castration"]);
+  assert.deepEqual(actionButtons().map((b) => b.textContent), ["Record castration"], "no breeding or calving for a male");
   assert.equal($("#milestone-form").hidden, true);
   assert.equal(profile().Category, "Bull");
 });
