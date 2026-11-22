@@ -68,8 +68,11 @@ def invalid_request(exc: RequestValidationError):
 PARENT_SEX = {"sire_id": "male", "dam_id": "female"}
 
 
-def invalid_parent_errors(animal_in: AnimalIn) -> list[dict]:
-    """Return a validation error for each of sire_id/dam_id that is not an existing animal of the right sex."""
+def invalid_parent_errors(animal_in: AnimalIn, animal_id: str | None = None) -> list[dict]:
+    """Return a validation error for each of sire_id/dam_id that is not an existing animal of the right sex.
+
+    animal_id is the animal being edited, if any, which can't be its own parent.
+    """
     repo = get_repository()
     errors = []
 
@@ -80,7 +83,9 @@ def invalid_parent_errors(animal_in: AnimalIn) -> list[dict]:
 
         parent = repo.get_animal(parent_id)
 
-        if parent is None:
+        if parent_id == animal_id:
+            msg = "An animal cannot be its own parent"
+        elif parent is None:
             msg = f"No animal with id {parent_id}"
         elif parent.sex != sex:
             msg = f"Animal {parent_id} is not {sex}"
@@ -133,6 +138,23 @@ def get_animal(animal_id: str) -> Response[Animal]:
 
     if animal is None:
         raise NotFoundError(f"Animal {animal_id} not found")
+
+    return Response(status_code=200, content_type="application/json", body=animal)
+
+
+@app.put("/animals/<animal_id>")
+def update_animal(animal_id: str, animal_in: AnimalIn) -> Response[Animal]:
+    """Replace every editable field of an existing animal; its id (and its events) stay as they were."""
+    repo = get_repository()
+
+    if not repo.animal_exists(animal_id):
+        raise NotFoundError(f"Animal {animal_id} not found")
+
+    if errors := invalid_parent_errors(animal_in, animal_id):
+        raise RequestValidationError(errors)
+
+    animal = Animal(id=animal_id, **animal_in.model_dump())
+    repo.replace_animal(animal)
 
     return Response(status_code=200, content_type="application/json", body=animal)
 
