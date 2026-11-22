@@ -8,7 +8,7 @@ from aws_lambda_powertools.event_handler.exceptions import NotFoundError
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 from aws_lambda_powertools.event_handler.openapi.params import Query
 
-from ranchhand.models import Animal, AnimalIn, AnimalList, Event, EventIn, EventList, Status
+from ranchhand.models import MILESTONES, Animal, AnimalIn, AnimalList, Event, EventIn, EventList, Status
 from ranchhand.repository import get_repository
 
 # A little awkward for now, but browsers send a credential-less preflight
@@ -92,15 +92,6 @@ def invalid_parent_errors(animal_in: AnimalIn) -> list[dict]:
     return errors
 
 
-# The sex each milestone event applies to, and the error when it's recorded for the other sex.
-# Event types not listed here (weaned, note) apply to either sex.
-EVENT_SEX_RULES = {
-    "castrated": ("male", "Only male animals can be castrated"),
-    "bred": ("female", "Only female animals can be bred"),
-    "calved": ("female", "Only female animals can calve"),
-}
-
-
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
@@ -155,9 +146,9 @@ def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
     if animal is None:
         raise NotFoundError(f"Animal {animal_id} not found")
 
-    rule = EVENT_SEX_RULES.get(event_in.type)
-    if rule is not None and animal.sex != rule[0]:
-        raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": rule[1]}])
+    milestone = MILESTONES.get(event_in.type)
+    if milestone is not None and animal.sex != milestone.sex:
+        raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": milestone.error}])
 
     event = Event(animal_id=animal_id, **event_in.model_dump())
     repo.put_event(event)

@@ -6,14 +6,10 @@ from functools import cache
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from ranchhand.models import Animal, Event, Status
+from ranchhand.models import MILESTONES, Animal, Event, Status
 
 TABLE_NAME = "ranchhand-herd"
 STATUS_INDEX = "status-index"
-
-
-# The animal flag each milestone event sets (see Animal.castrated and Animal.bred).
-EVENT_FLAGS = {"castrated": "castrated", "bred": "bred", "calved": "bred"}
 
 
 def animal_key(animal_id: str) -> dict:
@@ -82,9 +78,9 @@ class HerdRepository:
             "entity": "event",
             **event.model_dump(mode="json"),
         }
-        flag = EVENT_FLAGS.get(event.type)
+        milestone = MILESTONES.get(event.type)
 
-        if flag is None:
+        if milestone is None:
             self._table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
             return
 
@@ -103,7 +99,7 @@ class HerdRepository:
                         "Key": animal_key(event.animal_id),
                         "UpdateExpression": "SET #flag = :true",
                         "ConditionExpression": "attribute_exists(pk)",
-                        "ExpressionAttributeNames": {"#flag": flag},
+                        "ExpressionAttributeNames": {"#flag": milestone.flag},
                         "ExpressionAttributeValues": {":true": True},
                     }
                 },
