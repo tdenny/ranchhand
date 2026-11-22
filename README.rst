@@ -32,23 +32,11 @@ create the ``ranchhand-herd`` table::
 
     scripts/local-dynamodb.sh
 
-Then build the local package.
-Re-run this after changing anything under ``backend/src`` or
-``backend/requirements.txt``::
+Then build the local package. Re-run this after changing anything under
+``backend/src`` or ``backend/requirements.txt``. It also labels the package for
+SELinux hosts, where the container can't otherwise read it::
 
-    rm -rf .aws-sam/local-package
-    pip install -r backend/requirements.txt \
-                --target .aws-sam/local-package \
-                --platform manylinux2014_x86_64 \
-                --implementation cp \
-                --python-version 3.13 \
-                --only-binary=:all:
-    cp -r backend/src/. .aws-sam/local-package
-
-On SELinux hosts, label the package so the container can read it (otherwise the
-invoke fails with ``No module named 'ranchhand'``)::
-
-    chcon -R -t container_file_t .aws-sam/local-package
+    scripts/build-local-package.sh
 
 Finally, invoke the function with one of the sample events in ``events/``::
 
@@ -82,8 +70,8 @@ it once, start DynamoDB Local and build the package as above, then run::
 
 The API listens on ``http://127.0.0.1:3000`` and uses the ``API_TOKEN`` and
 ``CORS_ALLOW_ORIGIN`` values from ``env.local.json`` (``local-token`` and
-``http://localhost:8080``). Rebuild the package and restart after changing
-anything under ``backend/src``::
+``http://localhost:8080``). Run ``scripts/build-local-package.sh`` and restart after
+changing anything under ``backend/src``::
 
     curl -H "Authorization: Bearer local-token" http://127.0.0.1:3000/animals
 
