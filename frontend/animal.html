@@ -18,6 +18,20 @@
     <section id="profile" hidden>
       <h2 id="profile-title"></h2>
       <dl id="profile-details"></dl>
+
+      <div id="milestone-actions"></div>
+      <form id="milestone-form" hidden>
+        <h3 id="milestone-title"></h3>
+        <label>Date
+          <input name="date" type="date" required>
+        </label>
+        <label>Notes (optional)
+          <textarea name="notes" rows="3"></textarea>
+        </label>
+        <button type="submit">Save</button>
+        <button type="button" id="milestone-cancel" class="link">Cancel</button>
+      </form>
+      <p id="milestone-status" role="status"></p>
     </section>
 
     <section id="events-section" hidden>

@@ -63,8 +63,11 @@ button.link {
   font: inherit;
 }
 
-#status, #form-status { color: var(--muted); }
-#status.error, #form-status.error { color: var(--error); }
+#status, #form-status, #milestone-status { color: var(--muted); }
+#status.error, #form-status.error, #milestone-status.error { color: var(--error); }
+
+#milestone-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+button.action { padding: 0 1rem; }
 
 form {
   display: grid;
@@ -97,7 +100,7 @@ input, select, textarea {
 
 textarea { padding: 0.5rem; resize: vertical; }
 
-form button {
+form button, button.action {
   min-height: 2.75rem;
   font: inherit;
   color: #fff;
@@ -106,7 +109,7 @@ form button {
   border-radius: 0.5rem;
 }
 
-form button:disabled { opacity: 0.6; }
+form button:disabled, button.action:disabled { opacity: 0.6; }
 form #form-status { margin: 0; }
 
 ul {
