@@ -72,6 +72,19 @@ const MILESTONE_ACTIONS = [
     done: "Castration recorded.",
     applies: (animal) => animal.sex === "male" && !animal.castrated,
   },
+  // A cow is bred and calves again and again, so these stay available once recorded.
+  {
+    type: "bred",
+    label: "Record breeding",
+    done: "Breeding recorded.",
+    applies: (animal) => animal.sex === "female",
+  },
+  {
+    type: "calved",
+    label: "Record calving",
+    done: "Calving recorded.",
+    applies: (animal) => animal.sex === "female",
+  },
 ];
 
 let activeAction = null;
