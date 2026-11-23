@@ -9,6 +9,7 @@ import {
   updateAnimal,
 } from "./api.js";
 import { askForToken } from "./auth.js";
+import { BREEDING_LABELS } from "./labels.js";
 import { setupParentPicker } from "./parent-picker.js";
 
 const animalId = new URLSearchParams(window.location.search).get("id");
@@ -56,8 +57,6 @@ async function addCurrentParent(select, parentId) {
 // The animal as the API last returned it. Its breeding state and due date aren't editable (only
 // breeding events change them), so the form shows them as text and sends them back as they were.
 let current = null;
-
-const BREEDING_LABELS = { unbred: "Not yet bred", bred: "Bred", pregnant: "Pregnant", open: "Open" };
 
 function showBreedingSummary() {
   const summaryEl = document.querySelector("#breeding-summary");

@@ -9,6 +9,7 @@ import {
   listAnimalEvents,
 } from "./api.js";
 import { askForToken } from "./auth.js";
+import { BREEDING_LABELS, eventLabel } from "./labels.js";
 
 const animalId = new URLSearchParams(window.location.search).get("id");
 
@@ -129,6 +130,9 @@ function renderProfile(animal) {
   addDetail("Sex", animal.sex);
   addDetail("Status", animal.status);
   addDetail("Date of birth", animal.date_of_birth ?? "Unknown");
+  // Only females have a breeding state, and only a pregnant one may have a due date.
+  if (animal.breeding_state) addDetail("Breeding", BREEDING_LABELS[animal.breeding_state]);
+  if (animal.due_date) addDetail("Due", animal.due_date);
   document.querySelector("#edit-link").href = `edit.html?id=${encodeURIComponent(animal.id)}`;
   profileEl.hidden = false;
   renderMilestoneActions(animal);
@@ -143,11 +147,11 @@ function eventItem(event) {
 
   const heading = document.createElement("div");
   heading.className = "number";
-  heading.textContent = event.type[0].toUpperCase() + event.type.slice(1);
+  heading.textContent = eventLabel(event.type);
 
   const details = document.createElement("div");
   details.className = "details";
-  details.textContent = event.date;
+  details.textContent = event.due_date ? `${event.date} · due ${event.due_date}` : event.date;
 
   item.append(heading, details);
 
