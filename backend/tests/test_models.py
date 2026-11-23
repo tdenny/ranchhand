@@ -21,13 +21,15 @@ def fixed_today(monkeypatch):
     "fields, expected",
     [
         ({"sex": "female"}, "Heifer"),
-        ({"sex": "female", "bred": True}, "Cow"),
+        ({"sex": "female", "breeding_state": "bred"}, "Cow"),
+        ({"sex": "female", "breeding_state": "pregnant", "due_date": "2027-01-01"}, "Cow"),
+        ({"sex": "female", "breeding_state": "open"}, "Cow"),
         ({"sex": "male"}, "Bull"),
         ({"sex": "male", "castrated": True}, "Steer"),
         ({"sex": "female", "date_of_birth": "2025-01-01"}, "Heifer calf"),
         ({"sex": "male", "date_of_birth": "2025-01-01"}, "Bull calf"),
         # Calves stay calves whatever their flags say.
-        ({"sex": "female", "bred": True, "date_of_birth": "2025-01-01"}, "Heifer calf"),
+        ({"sex": "female", "breeding_state": "bred", "date_of_birth": "2025-01-01"}, "Heifer calf"),
         ({"sex": "male", "castrated": True, "date_of_birth": "2025-01-01"}, "Bull calf"),
     ],
 )
