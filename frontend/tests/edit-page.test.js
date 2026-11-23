@@ -5,9 +5,9 @@ import { jsonResponse, loadPage, waitFor } from "./dom.js";
 
 const cow = {
   id: "01COW", number: "301", sex: "female", status: "active", date_of_birth: "2020-04-01",
-  sire_id: "01BULL", dam_id: null, castrated: false, bred: true, category: "Cow",
+  sire_id: "01BULL", dam_id: null, castrated: false, breeding_state: "pregnant", due_date: "2027-02-01", category: "Cow",
 };
-const bull = { ...cow, id: "01BULL", number: "201", sex: "male", sire_id: null, bred: false, category: "Bull" };
+const bull = { ...cow, id: "01BULL", number: "201", sex: "male", sire_id: null, breeding_state: null, category: "Bull" };
 
 let calls = [];
 let rejectNextPut = false;
@@ -49,8 +49,8 @@ test("the form is filled with the animal's current values, including its parent"
   assert.equal(elements.date_of_birth.value, "2020-04-01");
   assert.equal(elements.sire_id.value, "01BULL");
   assert.equal(elements.dam_id.value, "");
-  assert.equal(elements.bred.checked, true);
-  assert.equal($("#bred-field").hidden, false);
+  assert.equal($("#breeding-summary").hidden, false);
+  assert.match($("#breeding-summary").textContent, /^Breeding: Pregnant, due 2027-02-01\./);
   assert.equal($("#castrated-field").hidden, true);
   assert.equal($("#edit-title").textContent, "Edit #301");
 });
@@ -60,7 +60,6 @@ test("saving PUTs the complete animal, so a cleared field is sent as cleared", a
   elements.number.value = "302";
   elements.status.value = "sold";
   elements.sire_id.value = "";
-  elements.bred.checked = false;
   calls = [];
 
   form().requestSubmit();
@@ -68,9 +67,28 @@ test("saving PUTs the complete animal, so a cleared field is sent as cleared", a
 
   assert.deepEqual(puts()[0].body, {
     number: "302", sex: "female", status: "sold", date_of_birth: "2020-04-01",
-    sire_id: "", dam_id: "", castrated: false, bred: false,
+    sire_id: "", dam_id: "", castrated: false, breeding_state: "pregnant", due_date: "2027-02-01",
   });
   assert.equal($("#edit-title").textContent, "Edit #302");
+});
+
+test("the breeding state is text, not a field, so it can't be changed from this form", () => {
+  assert.equal(form().elements.breeding_state, undefined);
+  assert.equal(form().elements.due_date, undefined);
+});
+
+test("a male is saved without a breeding state or due date, and shows no breeding line", async () => {
+  const { elements } = form();
+  elements.sex.value = "male";
+  elements.sex.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.equal($("#breeding-summary").hidden, true);
+  calls = [];
+
+  form().requestSubmit();
+  await waitFor(() => puts().length === 1, "the save");
+
+  assert.equal(puts()[0].body.breeding_state, null);
+  assert.equal(puts()[0].body.due_date, null);
 });
 
 test("a validation error from the API is shown and nothing claims to be saved", async () => {

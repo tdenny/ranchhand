@@ -53,13 +53,28 @@ async function addCurrentParent(select, parentId) {
   select.append(new Option(label, parentId, true, true));
 }
 
-// Only males can be castrated and only females bred; a hidden box is cleared so a stale tick is never saved.
+// The animal as the API last returned it. Its breeding state and due date aren't editable (only
+// breeding events change them), so the form shows them as text and sends them back as they were.
+let current = null;
+
+const BREEDING_LABELS = { unbred: "Not yet bred", bred: "Bred", pregnant: "Pregnant", open: "Open" };
+
+function showBreedingSummary() {
+  const summaryEl = document.querySelector("#breeding-summary");
+  const isFemale = formEl.elements.sex.value === "female";
+  const state = current.breeding_state ?? "unbred"; // a male has none
+  const due = state === "pregnant" && current.due_date ? `, due ${current.due_date}` : "";
+  summaryEl.textContent = `Breeding: ${BREEDING_LABELS[state]}${due}. Record breeding events on the animal's page to change this.`;
+  summaryEl.hidden = !isFemale;
+}
+
+// Only males can be castrated, and only females have a breeding state; a hidden box is cleared so a
+// stale tick is never saved.
 function showFlagFields() {
   const isMale = formEl.elements.sex.value === "male";
-  for (const [id, applies] of [["castrated", isMale], ["bred", !isMale]]) {
-    document.querySelector(`#${id}-field`).hidden = !applies;
-    if (!applies) formEl.elements[id].checked = false;
-  }
+  document.querySelector("#castrated-field").hidden = !isMale;
+  if (!isMale) formEl.elements.castrated.checked = false;
+  showBreedingSummary();
 }
 
 async function fillForm(animal) {
@@ -77,7 +92,7 @@ async function fillForm(animal) {
   elements.date_of_birth.value = animal.date_of_birth ?? "";
 
   elements.castrated.checked = animal.castrated;
-  elements.bred.checked = animal.bred;
+  current = animal;
   showFlagFields();
 
   await Promise.all([
@@ -130,6 +145,7 @@ formEl.addEventListener("submit", async (event) => {
   showStatus(formStatusEl, "Saving…");
 
   const { elements } = formEl;
+  const isFemale = elements.sex.value === "female";
   try {
     // The whole animal is sent, so cleared fields (no parent, no date of birth) are cleared.
     const animal = await updateAnimal(animalId, {
@@ -140,8 +156,10 @@ formEl.addEventListener("submit", async (event) => {
       sire_id: elements.sire_id.value,
       dam_id: elements.dam_id.value,
       castrated: elements.castrated.checked,
-      bred: elements.bred.checked,
+      breeding_state: isFemale ? (current.breeding_state ?? "unbred") : null,
+      due_date: isFemale ? (current.due_date ?? null) : null,
     });
+    current = animal;
     candidates = null; // the number may have changed, and so may who can be a parent
     document.querySelector("#edit-title").textContent = `Edit #${animal.number}`;
     document.querySelector("#back-link").textContent = `← #${animal.number}`;
