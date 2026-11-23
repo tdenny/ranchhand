@@ -28,17 +28,21 @@ function loadCandidates() {
 setupParentPicker(document.querySelector("#sire"), { sex: "male", loadCandidates });
 setupParentPicker(document.querySelector("#dam"), { sex: "female", loadCandidates });
 
-// Only males can be castrated and only females bred, so show whichever applies to the chosen sex.
-// A hidden box is cleared so a tick left over from the other sex is never submitted.
+// Only males can be castrated and only females have a breeding state (and a due date, once pregnant),
+// so show whichever applies. A hidden box or date is cleared so a leftover value is never submitted.
 function showFlagFields() {
-  const isMale = formEl.elements.sex.value === "male";
-  for (const [id, applies] of [["castrated", isMale], ["bred", !isMale]]) {
+  const { elements } = formEl;
+  const isMale = elements.sex.value === "male";
+  const isPregnant = !isMale && elements.breeding_state.value === "pregnant";
+  for (const [id, applies] of [["castrated", isMale], ["breeding-state", !isMale], ["due-date", isPregnant]]) {
     document.querySelector(`#${id}-field`).hidden = !applies;
-    if (!applies) formEl.elements[id].checked = false;
   }
+  if (!isMale) elements.castrated.checked = false;
+  if (!isPregnant) elements.due_date.value = "";
 }
 
 formEl.elements.sex.addEventListener("change", showFlagFields);
+formEl.elements.breeding_state.addEventListener("change", showFlagFields);
 showFlagFields();
 
 function showStatus(message, isError = false) {
@@ -60,11 +64,13 @@ formEl.addEventListener("submit", async (event) => {
 
   try {
     // An unchecked box is left out of the form data, and the API treats a missing flag as false.
-    const { castrated, bred, ...fields } = Object.fromEntries(new FormData(formEl));
+    // A male has no breeding state, so it is left out for him; an empty due date is left out too.
+    const { castrated, breeding_state, due_date, ...fields } = Object.fromEntries(new FormData(formEl));
     const animal = await createAnimal({
       ...fields,
       ...(castrated && { castrated: true }),
-      ...(bred && { bred: true }),
+      ...(fields.sex === "female" && { breeding_state }),
+      ...(due_date && { due_date }),
     });
     candidates = null; // the new animal can be a parent from now on
     formEl.reset();

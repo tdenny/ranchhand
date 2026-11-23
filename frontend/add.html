@@ -53,9 +53,16 @@
         <input name="castrated" type="checkbox">
         Already castrated
       </label>
-      <label class="check" id="bred-field">
-        <input name="bred" type="checkbox">
-        Already bred
+      <label id="breeding-state-field">Breeding
+        <select name="breeding_state">
+          <option value="unbred">Not yet bred</option>
+          <option value="bred">Bred</option>
+          <option value="pregnant">Pregnant</option>
+          <option value="open">Open</option>
+        </select>
+      </label>
+      <label id="due-date-field" hidden>Due date (optional)
+        <input name="due_date" type="date">
       </label>
       <button type="submit">Add animal</button>
       <p id="form-status" role="status"></p>
