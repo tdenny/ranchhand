@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, computed_field, field_validator, model_va
 
 from ranchhand.ulid import new_ulid
 
-
 Status = Literal["active", "deceased", "processed", "sold", "external"]
 Sex = Literal["female", "male"]
 # Milestones change an animal's state ("note" is a plain log entry that doesn't).
