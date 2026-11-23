@@ -1,6 +1,14 @@
 =========
-ranchhand
+Ranchhand
 =========
+
+.. image:: https://github.com/tdenny/ranchhand/actions/workflows/main.yml/badge.svg?branch=main
+   :target: https://github.com/tdenny/ranchhand/actions/workflows/main.yml
+   :alt: Ranchhand test and deploy
+
+.. image:: https://github.com/tdenny/ranchhand/actions/workflows/frontend.yml/badge.svg?branch=main
+   :target: https://github.com/tdenny/ranchhand/actions/workflows/frontend.yml
+   :alt: Ranchhand frontend tests
 
 Ranchhand is a simple tool for ranchers to keep track of their animals. It
 keeps a record for each animal, such as its tag number, sex, date of birth and
