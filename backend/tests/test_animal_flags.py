@@ -6,9 +6,7 @@ from helpers import BODY, ULID, api_event
 from ranchhand import handler as h
 
 
-@pytest.mark.parametrize(
-    "sex, flag", [("male", "castrated"), ("female", "bred")]
-)
+@pytest.mark.parametrize("sex, flag", [("male", "castrated"), ("female", "bred")])
 def test_create_animal_stores_milestone_flag_set_at_creation(table, sex, flag):
     body = {**BODY, "sex": sex, flag: True}
 
