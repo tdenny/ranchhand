@@ -13,18 +13,20 @@ Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf"]
 
 
 class Milestone(NamedTuple):
-    """What recording a milestone event means: the sex it applies to and the animal flag it sets."""
+    """What recording a milestone event means: the sex it applies to, the animal flag it sets (if any)
+    and, if the animal must already be bred, the error for one that isn't."""
 
     sex: Sex
-    flag: Literal["castrated", "bred"]
+    flag: Literal["castrated", "bred"] | None
     error: str
+    not_bred_error: str | None = None
 
 
 # Event types not listed here (weaned, note) apply to either sex and leave the animal unchanged.
 MILESTONES = {
     "castrated": Milestone("male", "castrated", "Only male animals can be castrated"),
     "bred": Milestone("female", "bred", "Only female animals can be bred"),
-    "calved": Milestone("female", "bred", "Only female animals can calve"),
+    "calved": Milestone("female", None, "Only female animals can calve", not_bred_error="Only bred animals can calve"),
 }
 
 CALF_YEARS = 2
