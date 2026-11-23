@@ -16,7 +16,8 @@ def test_create_animal_writes_profile_item(table):
         "entity": "animal",
         "id": ULID,
         **BODY,
-        **FLAGS_UNSET,
+        "castrated": False,
+        "breeding_state": "unbred",
     }
 
 

@@ -7,26 +7,55 @@ from ranchhand.ulid import new_ulid
 
 Status = Literal["active", "deceased", "processed", "sold", "external"]
 Sex = Literal["female", "male"]
-# Milestones change an animal's state ("note" is a plain log entry that doesn't).
-EventType = Literal["castrated", "bred", "calved", "weaned", "note"]
+BreedingState = Literal["unbred", "bred", "pregnant", "open"]
+# Log events record something that happened; castrated is also a milestone that changes the animal.
+LogEventType = Literal["castrated", "weaned", "note"]
+# Breeding events are the recurring workflow of a mature cow and move her through the BreedingStates.
+# A pregnancy check is recorded as what it found, so each outcome is its own event type.
+BreedingEventType = Literal["bred", "confirmed_pregnant", "confirmed_open", "calved", "lost"]
+EventType = Literal["castrated", "weaned", "note", "bred", "confirmed_pregnant", "confirmed_open", "calved", "lost"]
 Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf"]
+
+GESTATION_DAYS = 283
 
 
 class Milestone(NamedTuple):
-    """What recording a milestone event means: the sex it applies to, the animal flag it sets (if any)
-    and, if the animal must already be bred, the error for one that isn't."""
+    """What recording a milestone event means: the sex it applies to and the animal flag it sets."""
 
     sex: Sex
-    flag: Literal["castrated", "bred"] | None
+    flag: Literal["castrated"]
     error: str
-    not_bred_error: str | None = None
 
 
 # Event types not listed here (weaned, note) apply to either sex and leave the animal unchanged.
 MILESTONES = {
     "castrated": Milestone("male", "castrated", "Only male animals can be castrated"),
-    "bred": Milestone("female", "bred", "Only female animals can be bred"),
-    "calved": Milestone("female", None, "Only female animals can calve", not_bred_error="Only bred animals can calve"),
+}
+
+
+class BreedingTransition(NamedTuple):
+    """What a breeding event does to a female: the states she may be in (None: any), the one she ends in,
+    as well as an error string for the case where she is not in one of the from_states"""
+
+    from_states: frozenset[BreedingState] | None
+    to_state: BreedingState
+    error: str
+
+
+BRED_OR_PREGNANT = frozenset({"bred", "pregnant"})
+FEMALE_ONLY_ERROR = "Only female animals can have breeding events"
+
+TRANSITIONS = {
+    # None: a female can be bred again from any state, so there is no state to check (and no error to give).
+    "bred": BreedingTransition(None, "bred", ""),
+    "confirmed_pregnant": BreedingTransition(
+        BRED_OR_PREGNANT, "pregnant", "Only bred or pregnant animals can be pregnancy checked"
+    ),
+    "confirmed_open": BreedingTransition(
+        BRED_OR_PREGNANT, "open", "Only bred or pregnant animals can be pregnancy checked"
+    ),
+    "calved": BreedingTransition(BRED_OR_PREGNANT, "open", "Only bred or pregnant animals can calve"),
+    "lost": BreedingTransition(frozenset({"pregnant"}), "open", "Only pregnant animals can lose a pregnancy"),
 }
 
 CALF_YEARS = 2
@@ -56,7 +85,9 @@ class AnimalIn(BaseModel):
     sire_id: str | None = None
     dam_id: str | None = None
     castrated: bool = False
-    bred: bool = False
+    # Female only: None means unset, which becomes "unbred" for a female and stays None for a male.
+    breeding_state: BreedingState | None = None
+    due_date: date | None = None
 
     @field_validator("sire_id", "dam_id")
     @classmethod
@@ -70,8 +101,12 @@ class AnimalIn(BaseModel):
             raise ValueError("date_of_birth is required for animals that are not external")
         if self.castrated and self.sex == "female":
             raise ValueError("Only male animals can be castrated")
-        if self.bred and self.sex == "male":
-            raise ValueError("Only female animals can be bred")
+        if self.sex == "male" and self.breeding_state is not None:
+            raise ValueError("Only female animals have a breeding state")
+        if self.sex == "female" and self.breeding_state is None:
+            self.breeding_state = "unbred"
+        if self.due_date is not None and self.breeding_state != "pregnant":
+            raise ValueError("due_date requires a pregnant animal")
         return self
 
 
@@ -91,7 +126,7 @@ class Animal(AnimalIn):
             return "Bull calf" if self.sex == "male" else "Heifer calf"
         if self.sex == "male":
             return "Steer" if self.castrated else "Bull"
-        return "Cow" if self.bred else "Heifer"
+        return "Heifer" if self.breeding_state == "unbred" else "Cow"
 
 
 class AnimalList(BaseModel):
@@ -103,16 +138,40 @@ class AnimalList(BaseModel):
 class EventIn(BaseModel):
     """Request body for POST /animals/<animal_id>/events."""
 
-    type: EventType
+    type: LogEventType
     date: date
     notes: str | None = None
 
 
-class Event(EventIn):
+class BreedingEventIn(BaseModel):
+    """Request body for POST /animals/<animal_id>/breeding-events."""
+
+    type: BreedingEventType
+    date: date
+    notes: str | None = None
+    # Only for a confirmed pregnancy.
+    due_date: date | None = None
+
+    @model_validator(mode="after")
+    def check_field_combinations(self) -> Self:
+        if self.due_date is not None and self.type != "confirmed_pregnant":
+            raise ValueError("due_date is only for a confirmed pregnancy")
+        return self
+
+    @property
+    def transition(self) -> BreedingTransition:
+        return TRANSITIONS[self.type]
+
+
+class Event(BaseModel):
     """An animal event as stored and returned by the API."""
 
     id: str = Field(default_factory=lambda: new_ulid())
     animal_id: str
+    type: EventType
+    date: date
+    notes: str | None = None
+    due_date: date | None = None
 
 
 class EventList(BaseModel):
