@@ -33,13 +33,19 @@ def test_update_animal_replaces_every_field_and_returns_it(table):
         "date_of_birth": "2021-05-06",
         "sire_id": "SIRE",
         "castrated": True,
-        "bred": False,
     }
 
     response = h.handler(update_event(ULID, new), None)
 
     assert response["statusCode"] == 200
-    assert json.loads(response["body"]) == {"id": ULID, **new, "dam_id": None, "category": "Steer"}
+    assert json.loads(response["body"]) == {
+        "id": ULID,
+        **new,
+        "dam_id": None,
+        "breeding_state": None,
+        "due_date": None,
+        "category": "Steer",
+    }
     item = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE"})["Item"]
     assert item == {
         "pk": f"ANIMAL#{ULID}",
