@@ -49,7 +49,7 @@ def test_create_animal_event_invalid_body_returns_400(table):
 
 @pytest.mark.parametrize("event_type", ["castrated", "bred", "calved", "weaned", "note"])
 def test_create_animal_event_accepts_each_type(table, event_type):
-    put_animal(table, ULID, sex="male" if event_type == "castrated" else "female")
+    put_animal(table, ULID, sex="male" if event_type == "castrated" else "female", bred=event_type == "calved")
     body = {**EVENT_BODY, "type": event_type}
 
     response = h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps(body)), None)
@@ -151,7 +151,7 @@ def create_milestone_event(event_type, animal_id=ULID):
 
 @pytest.mark.parametrize(
     "sex, event_type, flag",
-    [("male", "castrated", "castrated"), ("female", "bred", "bred"), ("female", "calved", "bred")],
+    [("male", "castrated", "castrated"), ("female", "bred", "bred")],
 )
 def test_milestone_event_writes_event_and_sets_flag(table, sex, event_type, flag):
     put_animal(table, ULID, sex=sex)
@@ -167,11 +167,46 @@ def test_milestone_event_writes_event_and_sets_flag(table, sex, event_type, flag
 def test_milestone_event_sets_only_its_own_flag(table):
     put_animal(table, ULID, sex="female")
 
-    create_milestone_event("calved")
+    create_milestone_event("bred")
 
     item = profile(table)
     assert item["bred"] is True
     assert "castrated" not in item
+
+
+def test_calved_event_for_a_bred_cow_is_recorded_and_leaves_the_profile_alone(table):
+    put_animal(table, ULID, sex="female", bred=True)
+    before = profile(table)
+
+    response = create_milestone_event("calved")
+
+    assert response["statusCode"] == 201
+    assert profile(table) == before
+    assert table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": f"EVENT#{ULID}"})["Item"]["type"] == "calved"
+
+
+@pytest.mark.parametrize("bred", [False, None])
+def test_calved_event_for_an_unbred_cow_returns_400_without_writing(table, bred):
+    put_animal(table, ULID, sex="female", bred=bred)  # None: a legacy item without the attribute
+    before = table.scan()["Items"]
+
+    response = create_milestone_event("calved")
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [(e["loc"], e["msg"]) for e in errors] == [(["body", "type"], "Only bred animals can calve")]
+    assert table.scan()["Items"] == before
+
+
+def test_calved_event_is_refused_if_the_cow_is_not_bred_at_write_time(table):
+    put_animal(table, ULID, sex="female")  # the route's check passed earlier; the transaction has the last word
+    before = table.scan()["Items"]
+
+    with pytest.raises(ClientError) as raised:
+        get_repository().put_event(models.Event(animal_id=ULID, **{**EVENT_BODY, "type": "calved"}))
+
+    assert raised.value.response["Error"]["Code"] == "TransactionCanceledException"
+    assert table.scan()["Items"] == before
 
 
 def test_milestone_event_changes_the_category(table):

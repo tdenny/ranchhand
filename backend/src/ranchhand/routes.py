@@ -171,6 +171,10 @@ def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
     milestone = MILESTONES.get(event_in.type)
     if milestone is not None and animal.sex != milestone.sex:
         raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": milestone.error}])
+    if milestone is not None and milestone.not_bred_error and not animal.bred:
+        raise RequestValidationError(
+            [{"type": "value_error", "loc": ["body", "type"], "msg": milestone.not_bred_error}]
+        )
 
     event = Event(animal_id=animal_id, **event_in.model_dump())
     repo.put_event(event)
