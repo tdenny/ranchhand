@@ -1,5 +1,6 @@
 import hmac
 import os
+from datetime import date, timedelta
 from typing import Annotated, get_args
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig, Response
@@ -8,7 +9,19 @@ from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 from aws_lambda_powertools.event_handler.openapi.params import Query
 
-from ranchhand.models import MILESTONES, Animal, AnimalIn, AnimalList, Event, EventIn, EventList, Status
+from ranchhand.models import (
+    FEMALE_ONLY_ERROR,
+    GESTATION_DAYS,
+    MILESTONES,
+    Animal,
+    AnimalIn,
+    AnimalList,
+    BreedingEventIn,
+    Event,
+    EventIn,
+    EventList,
+    Status,
+)
 from ranchhand.repository import get_repository
 
 # A little awkward for now, but browsers send a credential-less preflight
@@ -171,10 +184,6 @@ def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
     milestone = MILESTONES.get(event_in.type)
     if milestone is not None and animal.sex != milestone.sex:
         raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": milestone.error}])
-    if milestone is not None and milestone.not_bred_error and not animal.bred:
-        raise RequestValidationError(
-            [{"type": "value_error", "loc": ["body", "type"], "msg": milestone.not_bred_error}]
-        )
 
     event = Event(animal_id=animal_id, **event_in.model_dump())
     repo.put_event(event)
@@ -185,6 +194,43 @@ def create_animal_event(animal_id: str, event_in: EventIn) -> Response[Event]:
         headers={"location": f"/animals/{animal_id}/events/{event.id}"},
         body=event,
     )
+
+
+@app.post("/animals/<animal_id>/breeding-events")
+def create_animal_breeding_event(animal_id: str, event_in: BreedingEventIn) -> Response[Event]:
+    """Write a breeding event for an existing female, and move her to the breeding state it leads to."""
+    repo = get_repository()
+    animal = repo.get_animal(animal_id)
+
+    if animal is None:
+        raise NotFoundError(f"Animal {animal_id} not found")
+
+    transition = event_in.transition
+    error = None
+    if animal.sex != "female":
+        error = FEMALE_ONLY_ERROR
+    elif transition.from_states is not None and animal.breeding_state not in transition.from_states:
+        error = transition.error
+    if error:
+        raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": error}])
+
+    event = Event(animal_id=animal_id, **event_in.model_dump())
+    if event.type == "confirmed_pregnant" and event.due_date is None:
+        event.due_date = default_due_date(repo.list_events(animal_id), event.date)
+    repo.put_breeding_event(event, transition.from_states, transition.to_state)
+
+    return Response(
+        status_code=201,
+        content_type="application/json",
+        headers={"location": f"/animals/{animal_id}/events/{event.id}"},
+        body=event,
+    )
+
+
+def default_due_date(events: list[Event], checked_on: date) -> date | None:
+    """The gestation period after the latest breeding on or before checked_on; None if none is recorded."""
+    bred_dates = [e.date for e in events if e.type == "bred" and e.date <= checked_on]
+    return max(bred_dates) + timedelta(days=GESTATION_DAYS) if bred_dates else None
 
 
 @app.get("/animals/<animal_id>/events")
