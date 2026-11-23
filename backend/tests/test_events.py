@@ -2,7 +2,7 @@ import json
 
 import pytest
 from botocore.exceptions import ClientError
-from helpers import BODY, EVENT_BODY, ULID, api_event, put_animal
+from helpers import BODY, EVENT_BODY, EVENT_UNSET, ULID, api_event, put_animal
 
 from ranchhand import handler as h
 from ranchhand import models
@@ -21,6 +21,7 @@ def test_create_animal_event_writes_event_item(table):
         "id": ULID,
         "animal_id": ULID,
         **EVENT_BODY,
+        **EVENT_UNSET,
     }
 
 
@@ -30,7 +31,7 @@ def test_create_animal_event_returns_201(table):
 
     assert response["statusCode"] == 201
     assert response["headers"]["location"] == f"/animals/{ULID}/events/{ULID}"
-    assert json.loads(response["body"]) == {"id": ULID, "animal_id": ULID, **EVENT_BODY}
+    assert json.loads(response["body"]) == {"id": ULID, "animal_id": ULID, **EVENT_BODY, **EVENT_UNSET}
 
 
 def test_create_animal_event_unknown_animal_returns_404(table):
@@ -47,9 +48,9 @@ def test_create_animal_event_invalid_body_returns_400(table):
     assert response["statusCode"] == 400
 
 
-@pytest.mark.parametrize("event_type", ["castrated", "bred", "calved", "weaned", "note"])
+@pytest.mark.parametrize("event_type", ["castrated", "weaned", "note"])
 def test_create_animal_event_accepts_each_type(table, event_type):
-    put_animal(table, ULID, sex="male" if event_type == "castrated" else "female", bred=event_type == "calved")
+    put_animal(table, ULID, sex="male")
     body = {**EVENT_BODY, "type": event_type}
 
     response = h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps(body)), None)
@@ -58,7 +59,11 @@ def test_create_animal_event_accepts_each_type(table, event_type):
     assert json.loads(response["body"])["type"] == event_type
 
 
-@pytest.mark.parametrize("event_type", ["vaccination", "Note", "", "castrate"])
+# Breeding events have their own route, so this one can't change a breeding state.
+@pytest.mark.parametrize(
+    "event_type",
+    ["vaccination", "Note", "", "castrate", "bred", "confirmed_pregnant", "confirmed_open", "calved", "lost"],
+)
 def test_create_animal_event_unknown_type_returns_400_without_writing(table, event_type):
     h.handler(api_event(body=json.dumps(BODY)), None)
     body = {**EVENT_BODY, "type": event_type}
@@ -103,6 +108,7 @@ def test_list_animal_events_returns_events_newest_first(table):
         "id": "01ARZ3NDEKTSV4RRFFQ69G5FA3",
         "animal_id": ULID,
         **{**EVENT_BODY, "type": "calved"},
+        **EVENT_UNSET,
     }
 
 
@@ -149,67 +155,18 @@ def create_milestone_event(event_type, animal_id=ULID):
     return h.handler(api_event(f"POST /animals/{animal_id}/events", body=json.dumps(body)), None)
 
 
-@pytest.mark.parametrize(
-    "sex, event_type, flag",
-    [("male", "castrated", "castrated"), ("female", "bred", "bred")],
-)
-def test_milestone_event_writes_event_and_sets_flag(table, sex, event_type, flag):
-    put_animal(table, ULID, sex=sex)
+def test_castrated_event_writes_event_and_sets_flag(table):
+    put_animal(table, ULID, sex="male")
 
-    response = create_milestone_event(event_type)
+    response = create_milestone_event("castrated")
 
     assert response["statusCode"] == 201
-    assert profile(table)[flag] is True
+    assert profile(table)["castrated"] is True
     event = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": f"EVENT#{ULID}"})["Item"]
-    assert event["type"] == event_type
+    assert event["type"] == "castrated"
 
 
-def test_milestone_event_sets_only_its_own_flag(table):
-    put_animal(table, ULID, sex="female")
-
-    create_milestone_event("bred")
-
-    item = profile(table)
-    assert item["bred"] is True
-    assert "castrated" not in item
-
-
-def test_calved_event_for_a_bred_cow_is_recorded_and_leaves_the_profile_alone(table):
-    put_animal(table, ULID, sex="female", bred=True)
-    before = profile(table)
-
-    response = create_milestone_event("calved")
-
-    assert response["statusCode"] == 201
-    assert profile(table) == before
-    assert table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": f"EVENT#{ULID}"})["Item"]["type"] == "calved"
-
-
-@pytest.mark.parametrize("bred", [False, None])
-def test_calved_event_for_an_unbred_cow_returns_400_without_writing(table, bred):
-    put_animal(table, ULID, sex="female", bred=bred)  # None: a legacy item without the attribute
-    before = table.scan()["Items"]
-
-    response = create_milestone_event("calved")
-
-    assert response["statusCode"] == 400
-    errors = json.loads(response["body"])["errors"]
-    assert [(e["loc"], e["msg"]) for e in errors] == [(["body", "type"], "Only bred animals can calve")]
-    assert table.scan()["Items"] == before
-
-
-def test_calved_event_is_refused_if_the_cow_is_not_bred_at_write_time(table):
-    put_animal(table, ULID, sex="female")  # the route's check passed earlier; the transaction has the last word
-    before = table.scan()["Items"]
-
-    with pytest.raises(ClientError) as raised:
-        get_repository().put_event(models.Event(animal_id=ULID, **{**EVENT_BODY, "type": "calved"}))
-
-    assert raised.value.response["Error"]["Code"] == "TransactionCanceledException"
-    assert table.scan()["Items"] == before
-
-
-def test_milestone_event_changes_the_category(table):
+def test_castrated_event_changes_the_category(table):
     put_animal(table, ULID, sex="male")
     assert json.loads(h.handler(api_event(f"GET /animals/{ULID}"), None)["body"])["category"] == "Bull"
 
@@ -218,7 +175,7 @@ def test_milestone_event_changes_the_category(table):
     assert json.loads(h.handler(api_event(f"GET /animals/{ULID}"), None)["body"])["category"] == "Steer"
 
 
-def test_milestone_event_for_an_already_flagged_animal_keeps_the_flag(table):
+def test_castrated_event_for_an_already_castrated_animal_keeps_the_flag(table):
     put_animal(table, ULID, sex="male", castrated=True)
 
     response = create_milestone_event("castrated")
@@ -227,23 +184,15 @@ def test_milestone_event_for_an_already_flagged_animal_keeps_the_flag(table):
     assert profile(table)["castrated"] is True
 
 
-@pytest.mark.parametrize(
-    "sex, event_type, msg",
-    [
-        ("female", "castrated", "Only male animals can be castrated"),
-        ("male", "bred", "Only female animals can be bred"),
-        ("male", "calved", "Only female animals can calve"),
-    ],
-)
-def test_milestone_event_for_the_wrong_sex_returns_400_without_writing(table, sex, event_type, msg):
-    put_animal(table, ULID, sex=sex)
+def test_castrated_event_for_a_female_returns_400_without_writing(table):
+    put_animal(table, ULID, sex="female")
     before = table.scan()["Items"]
 
-    response = create_milestone_event(event_type)
+    response = create_milestone_event("castrated")
 
     assert response["statusCode"] == 400
     errors = json.loads(response["body"])["errors"]
-    assert [(e["loc"], e["msg"]) for e in errors] == [(["body", "type"], msg)]
+    assert [(e["loc"], e["msg"]) for e in errors] == [(["body", "type"], "Only male animals can be castrated")]
     assert table.scan()["Items"] == before
 
 
@@ -260,12 +209,12 @@ def test_non_milestone_events_apply_to_either_sex_and_leave_the_profile_alone(ta
 
 
 def test_milestone_event_with_a_taken_id_changes_nothing(table):
-    put_animal(table, ULID, sex="female")
+    put_animal(table, ULID, sex="male")
     put_event(table, ULID, ULID, type="note")  # the id the new event is about to get
     before = table.scan()["Items"]
 
     with pytest.raises(ClientError) as raised:
-        get_repository().put_event(models.Event(animal_id=ULID, **{**EVENT_BODY, "type": "bred"}))
+        get_repository().put_event(models.Event(animal_id=ULID, **{**EVENT_BODY, "type": "castrated"}))
 
     assert raised.value.response["Error"]["Code"] == "TransactionCanceledException"
     assert table.scan()["Items"] == before
