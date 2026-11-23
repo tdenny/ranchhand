@@ -3,10 +3,10 @@ import { before, test } from "node:test";
 
 import { jsonResponse, loadPage, waitFor } from "./dom.js";
 
-// The API state: recording breeding or calving sets the bred flag, as the real transaction does.
+// The API state: recording breeding moves the animal to the bred state, as the real transaction does.
 let animal = {
   id: "01COW", number: "101", sex: "female", status: "active", date_of_birth: "2020-04-01",
-  castrated: false, bred: false, category: "Heifer",
+  castrated: false, breeding_state: "unbred", due_date: null, category: "Heifer",
 };
 let calls = [];
 let window;
@@ -19,8 +19,8 @@ before(async () => {
 
     if (method === "GET" && pathname === "/animals/01COW") return jsonResponse(animal);
     if (method === "GET" && pathname === "/animals/01COW/events") return jsonResponse({ events: [] });
-    if (method === "POST" && pathname === "/animals/01COW/events") {
-      animal = { ...animal, bred: true, category: "Cow" };
+    if (method === "POST" && pathname === "/animals/01COW/breeding-events") {
+      animal = { ...animal, breeding_state: "bred", category: "Cow" };
       return jsonResponse({ id: "01E1", animal_id: "01COW", ...JSON.parse(options.body) }, 201);
     }
     return jsonResponse({ message: "Not found" }, 404);

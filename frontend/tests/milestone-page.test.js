@@ -6,7 +6,7 @@ import { jsonResponse, loadPage, waitFor } from "./dom.js";
 // The API state: recording a castration flips the flag, as the real transaction does.
 let animal = {
   id: "01BULL", number: "201", sex: "male", status: "active", date_of_birth: "2020-04-01",
-  castrated: false, bred: false, category: "Bull",
+  castrated: false, breeding_state: null, due_date: null, category: "Bull",
 };
 let failNextPost = false;
 let calls = [];

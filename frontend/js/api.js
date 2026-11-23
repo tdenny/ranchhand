@@ -92,3 +92,9 @@ export async function listAnimalEvents(id) {
 export function createEvent(animalId, event) {
   return request(`/animals/${encodeURIComponent(animalId)}/events`, { method: "POST", body: event });
 }
+
+// Breeding events (bred, calved, ...) have their own endpoint because they move the animal between
+// breeding states; the API rejects them on the plain events endpoint.
+export function createBreedingEvent(animalId, event) {
+  return request(`/animals/${encodeURIComponent(animalId)}/breeding-events`, { method: "POST", body: event });
+}

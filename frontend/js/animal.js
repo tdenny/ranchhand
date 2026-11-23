@@ -2,6 +2,7 @@ import {
   NotFoundError,
   UnauthorizedError,
   ValidationError,
+  createBreedingEvent,
   createEvent,
   getAnimal,
   getToken,
@@ -64,10 +65,11 @@ async function addParent(label, parentId) {
   }
 }
 
-// The milestones that can be recorded from this page, and when each one applies to an animal.
+// The events that can be recorded from this page, which endpoint takes each, and when it applies to an animal.
 const MILESTONE_ACTIONS = [
   {
     type: "castrated",
+    create: createEvent,
     label: "Record castration",
     done: "Castration recorded.",
     applies: (animal) => animal.sex === "male" && !animal.castrated,
@@ -75,12 +77,14 @@ const MILESTONE_ACTIONS = [
   // A cow is bred and calves again and again, so these stay available once recorded.
   {
     type: "bred",
+    create: createBreedingEvent,
     label: "Record breeding",
     done: "Breeding recorded.",
     applies: (animal) => animal.sex === "female",
   },
   {
     type: "calved",
+    create: createBreedingEvent,
     label: "Record calving",
     done: "Calving recorded.",
     applies: (animal) => animal.sex === "female",
@@ -259,7 +263,7 @@ milestoneFormEl.addEventListener("submit", async (submitEvent) => {
   const { date, notes } = Object.fromEntries(new FormData(milestoneFormEl));
 
   try {
-    const event = await createEvent(animalId, { type: action.type, date, notes: notes.trim() || null });
+    const event = await action.create(animalId, { type: action.type, date, notes: notes.trim() || null });
     eventListEl.prepend(eventItem(event));
     showStatus(eventsStatusEl, "");
 
