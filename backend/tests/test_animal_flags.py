@@ -6,27 +6,68 @@ from helpers import BODY, ULID, api_event
 from ranchhand import handler as h
 
 
-@pytest.mark.parametrize("sex, flag", [("male", "castrated"), ("female", "bred")])
-def test_create_animal_stores_milestone_flag_set_at_creation(table, sex, flag):
-    body = {**BODY, "sex": sex, flag: True}
+def create(**fields):
+    return h.handler(api_event(body=json.dumps({**BODY, **fields})), None)
 
-    response = h.handler(api_event(body=json.dumps(body)), None)
+
+def stored(table):
+    return table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE"})["Item"]
+
+
+def test_create_animal_stores_castrated_set_at_creation(table):
+    response = create(sex="male", castrated=True)
 
     assert response["statusCode"] == 201
-    assert json.loads(response["body"])[flag] is True
-    item = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE"})["Item"]
-    assert item[flag] is True
+    assert json.loads(response["body"])["castrated"] is True
+    assert stored(table)["castrated"] is True
+
+
+def test_create_female_without_a_breeding_state_is_unbred(table):
+    response = create()
+
+    assert json.loads(response["body"])["breeding_state"] == "unbred"
+    assert stored(table)["breeding_state"] == "unbred"
+
+
+def test_create_male_has_no_breeding_state(table):
+    response = create(sex="male")
+
+    assert json.loads(response["body"])["breeding_state"] is None
+    assert "breeding_state" not in stored(table)
+
+
+@pytest.mark.parametrize("state", ["unbred", "bred", "open"])
+def test_create_animal_stores_breeding_state_set_at_creation(table, state):
+    response = create(breeding_state=state)
+
+    assert response["statusCode"] == 201
+    assert stored(table)["breeding_state"] == state
+
+
+def test_create_pregnant_animal_stores_the_due_date(table):
+    response = create(breeding_state="pregnant", due_date="2027-02-01")
+
+    assert response["statusCode"] == 201
+    assert json.loads(response["body"])["due_date"] == "2027-02-01"
+    assert stored(table)["due_date"] == "2027-02-01"
+
+
+def test_create_pregnant_animal_may_omit_the_due_date(table):
+    assert create(breeding_state="pregnant")["statusCode"] == 201
+    assert "due_date" not in stored(table)
 
 
 @pytest.mark.parametrize(
-    "sex, flag, msg",
+    "fields, msg",
     [
-        ("female", "castrated", "Only male animals can be castrated"),
-        ("male", "bred", "Only female animals can be bred"),
+        ({"sex": "female", "castrated": True}, "Only male animals can be castrated"),
+        ({"sex": "male", "breeding_state": "bred"}, "Only female animals have a breeding state"),
+        ({"breeding_state": "bred", "due_date": "2027-02-01"}, "due_date requires a pregnant animal"),
+        ({"due_date": "2027-02-01"}, "due_date requires a pregnant animal"),
     ],
 )
-def test_create_animal_flag_for_wrong_sex_returns_400_without_writing(table, sex, flag, msg):
-    response = h.handler(api_event(body=json.dumps({**BODY, "sex": sex, flag: True})), None)
+def test_create_animal_invalid_flag_combination_returns_400_without_writing(table, fields, msg):
+    response = create(**fields)
 
     assert response["statusCode"] == 400
     errors = json.loads(response["body"])["errors"]
@@ -34,23 +75,13 @@ def test_create_animal_flag_for_wrong_sex_returns_400_without_writing(table, sex
     assert table.scan()["Items"] == []
 
 
-@pytest.mark.parametrize("sex, flag", [("female", "castrated"), ("male", "bred")])
-def test_create_animal_false_flag_is_accepted_for_either_sex(table, sex, flag):
-    response = h.handler(api_event(body=json.dumps({**BODY, "sex": sex, flag: False})), None)
-
-    assert response["statusCode"] == 201
+def test_create_animal_false_castrated_is_accepted_for_either_sex(table):
+    assert create(sex="female", castrated=False)["statusCode"] == 201
 
 
-def test_create_animal_non_boolean_flag_returns_400(table):
-    body = {**BODY, "sex": "male", "castrated": "maybe"}
-
-    assert h.handler(api_event(body=json.dumps(body)), None)["statusCode"] == 400
+def test_create_animal_non_boolean_castrated_returns_400(table):
+    assert create(sex="male", castrated="maybe")["statusCode"] == 400
 
 
-def test_legacy_item_without_flags_reads_as_not_castrated_or_bred(table):
-    table.put_item(Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY})
-
-    response = h.handler(api_event(f"GET /animals/{ULID}"), None)
-
-    animal = json.loads(response["body"])
-    assert (animal["castrated"], animal["bred"]) == (False, False)
+def test_create_animal_unknown_breeding_state_returns_400(table):
+    assert create(breeding_state="expecting")["statusCode"] == 400
