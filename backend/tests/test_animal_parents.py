@@ -50,9 +50,7 @@ def test_create_animal_free_text_parent_returns_400(table):
     assert h.handler(api_event(body=json.dumps(body)), None)["statusCode"] == 400
 
 
-@pytest.mark.parametrize(
-    "field, parent_sex", [("sire_id", "female"), ("dam_id", "male")]
-)
+@pytest.mark.parametrize("field, parent_sex", [("sire_id", "female"), ("dam_id", "male")])
 def test_create_animal_parent_of_wrong_sex_returns_400_without_writing(table, field, parent_sex):
     put_animal(table, "P", sex=parent_sex)
 
