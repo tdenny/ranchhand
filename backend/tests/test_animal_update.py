@@ -7,8 +7,15 @@ from ranchhand import handler as h
 
 def put_event_item(table, animal_id, event_id):
     table.put_item(
-        Item={"pk": f"ANIMAL#{animal_id}", "sk": f"EVENT#{event_id}", "entity": "event", "id": event_id,
-              "animal_id": animal_id, "type": "note", "date": "2024-01-01"}
+        Item={
+            "pk": f"ANIMAL#{animal_id}",
+            "sk": f"EVENT#{event_id}",
+            "entity": "event",
+            "id": event_id,
+            "animal_id": animal_id,
+            "type": "note",
+            "date": "2024-01-01",
+        }
     )
 
 
@@ -19,18 +26,28 @@ def update_event(animal_id, body):
 def test_update_animal_replaces_every_field_and_returns_it(table):
     put_animal(table, ULID, sire_id="OLDSIRE", dam_id="OLDDAM")
     put_animal(table, "SIRE", sex="male", number="1")
-    new = {"number": "102", "status": "sold", "sex": "male", "date_of_birth": "2021-05-06",
-           "sire_id": "SIRE", "castrated": True, "bred": False}
+    new = {
+        "number": "102",
+        "status": "sold",
+        "sex": "male",
+        "date_of_birth": "2021-05-06",
+        "sire_id": "SIRE",
+        "castrated": True,
+        "bred": False,
+    }
 
     response = h.handler(update_event(ULID, new), None)
 
     assert response["statusCode"] == 200
-    assert json.loads(response["body"]) == {
-        "id": ULID, **new, "dam_id": None, "category": "Steer"
-    }
+    assert json.loads(response["body"]) == {"id": ULID, **new, "dam_id": None, "category": "Steer"}
     item = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE"})["Item"]
-    assert item == {"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID,
-                    **{k: v for k, v in new.items()}}  # the cleared dam_id is gone, not null
+    assert item == {
+        "pk": f"ANIMAL#{ULID}",
+        "sk": "PROFILE",
+        "entity": "animal",
+        "id": ULID,
+        **{k: v for k, v in new.items()},
+    }  # the cleared dam_id is gone, not null
 
 
 def test_update_animal_keeps_events(table):
