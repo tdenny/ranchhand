@@ -108,3 +108,74 @@ def test_update_animal_requires_the_token(table):
     event["headers"].pop("authorization")
 
     assert h.handler(event, None)["statusCode"] == 401
+
+
+def stored_state(table):
+    item = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE"})["Item"]
+    return item.get("breeding_state"), item.get("due_date")
+
+
+def test_update_animal_keeps_its_breeding_state_and_due_date_when_sent_back_unchanged(table):
+    put_animal(table, ULID, breeding_state="pregnant", due_date="2027-02-01")
+    body = {**BODY, "number": "999", "breeding_state": "pregnant", "due_date": "2027-02-01"}
+
+    response = h.handler(update_event(ULID, body), None)
+
+    assert response["statusCode"] == 200
+    assert stored_state(table) == ("pregnant", "2027-02-01")
+
+
+def test_update_animal_cannot_change_its_breeding_state(table):
+    put_animal(table, ULID, breeding_state="bred")
+    before = table.scan()["Items"]
+
+    response = h.handler(update_event(ULID, {**BODY, "breeding_state": "pregnant"}), None)
+
+    assert response["statusCode"] == 400
+    errors = json.loads(response["body"])["errors"]
+    assert [e["loc"] for e in errors] == [["body", "breeding_state"]]
+    assert table.scan()["Items"] == before
+
+
+def test_update_animal_cannot_change_its_due_date(table):
+    put_animal(table, ULID, breeding_state="pregnant", due_date="2027-02-01")
+    before = table.scan()["Items"]
+    body = {**BODY, "breeding_state": "pregnant", "due_date": "2027-03-01"}
+
+    response = h.handler(update_event(ULID, body), None)
+
+    assert response["statusCode"] == 400
+    assert [e["loc"] for e in json.loads(response["body"])["errors"]] == [["body", "due_date"]]
+    assert table.scan()["Items"] == before
+
+
+def test_update_animal_omitting_the_breeding_state_of_a_bred_cow_is_a_change(table):
+    put_animal(table, ULID, breeding_state="bred")
+
+    response = h.handler(update_event(ULID, BODY), None)  # BODY has none, so it would read as unbred
+
+    assert response["statusCode"] == 400
+    assert stored_state(table) == ("bred", None)
+
+
+def test_update_animal_can_fix_the_sex_of_an_animal_that_was_never_bred(table):
+    put_animal(table, ULID, sex="male")  # entered as a bull by mistake
+
+    response = h.handler(update_event(ULID, {**BODY, "sex": "female"}), None)
+
+    assert response["statusCode"] == 200
+    assert stored_state(table) == ("unbred", None)
+
+    response = h.handler(update_event(ULID, {**BODY, "sex": "male"}), None)  # and back again
+
+    assert response["statusCode"] == 200
+    assert stored_state(table) == (None, None)
+
+
+def test_update_animal_cannot_make_a_bred_cow_male(table):
+    put_animal(table, ULID, breeding_state="open")
+
+    response = h.handler(update_event(ULID, {**BODY, "sex": "male"}), None)
+
+    assert response["statusCode"] == 400
+    assert [e["loc"] for e in json.loads(response["body"])["errors"]] == [["body", "breeding_state"]]
