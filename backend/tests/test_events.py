@@ -11,7 +11,7 @@ from ranchhand.repository import get_repository
 
 def test_create_animal_event_writes_event_item(table):
     h.handler(api_event(body=json.dumps(BODY)), None)
-    h.handler(api_event("POST /animals/{}/events".format(ULID), body=json.dumps(EVENT_BODY)), None)
+    h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps(EVENT_BODY)), None)
 
     item = table.get_item(Key={"pk": f"ANIMAL#{ULID}", "sk": f"EVENT#{ULID}"})["Item"]
     assert item == {
