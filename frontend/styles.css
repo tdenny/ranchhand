@@ -5,6 +5,7 @@
   --muted: #666;
   --accent: #2f6b3a;
   --error: #a32020;
+
   color-scheme: light;
 
   /* Theme for Choices.js (the sire/dam pickers); see choices.min.css for the variables. */
@@ -57,7 +58,7 @@ button.link {
   min-height: 2.75rem;
   padding: 0 0.75rem;
   background: none;
-  border: 1px solid currentColor;
+  border: 1px solid currentcolor;
   border-radius: 0.5rem;
   color: inherit;
   font: inherit;
@@ -76,7 +77,7 @@ form {
   padding: 0.75rem 1rem;
   background: var(--card);
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
 }
 
 label { display: grid; gap: 0.25rem; font-size: 0.9rem; color: var(--muted); }
@@ -86,7 +87,7 @@ label { display: grid; gap: 0.25rem; font-size: 0.9rem; color: var(--muted); }
 
 label.check { display: flex; align-items: center; gap: 0.5rem; }
 
-input[type=checkbox] { min-height: 0; width: 1.25rem; height: 1.25rem; }
+input[type="checkbox"] { min-height: 0; width: 1.25rem; height: 1.25rem; }
 
 input, select, textarea {
   min-height: 2.75rem;
@@ -124,7 +125,7 @@ li {
   background: var(--card);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
 }
 
 li .number { font-size: 1.1rem; font-weight: 600; }
@@ -145,15 +146,17 @@ li a.number {
   color: var(--accent);
   text-decoration: none;
 }
+
 li a.number::after {
   content: "";
   width: 1.25rem;
   height: 1.25rem;
   margin-left: auto;
   transform: translateY(0.1rem);
-  background: currentColor;
+  background: currentcolor;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat;
 }
+
 li a.number:hover,
 li a.number:focus-visible { background: var(--accent); color: var(--card); }
 
@@ -167,7 +170,7 @@ dl {
   padding: 0.75rem 1rem;
   background: var(--card);
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
 }
 
 dt { color: var(--muted); }
