@@ -69,9 +69,7 @@ class HerdRepository:
         items = []
 
         for status in dict.fromkeys(statuses):
-            items.extend(
-                self._query_all(IndexName=STATUS_INDEX, KeyConditionExpression=Key("status").eq(status))
-            )
+            items.extend(self._query_all(IndexName=STATUS_INDEX, KeyConditionExpression=Key("status").eq(status)))
 
         # Each status comes back ordered by number (the index range key); merge them into one ordering.
         return sorted((Animal.model_validate(item) for item in items), key=lambda animal: animal.number)

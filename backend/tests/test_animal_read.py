@@ -11,9 +11,7 @@ from ranchhand.repository import HerdRepository
 def test_list_animals_returns_all_animals(table):
     other = {**BODY, "number": "102"}
     for i, body in enumerate((BODY, other)):
-        table.put_item(
-            Item={"pk": f"ANIMAL#{i}", "sk": "PROFILE", "entity": "animal", "id": str(i), **body}
-        )
+        table.put_item(Item={"pk": f"ANIMAL#{i}", "sk": "PROFILE", "entity": "animal", "id": str(i), **body})
     table.put_item(Item={"pk": "OTHER#1", "sk": "PROFILE", "entity": "other"})
 
     response = h.handler(api_event("GET /animals"), None)
@@ -26,9 +24,7 @@ def test_list_animals_returns_all_animals(table):
 
 
 def test_get_animal_returns_animal(table):
-    table.put_item(
-        Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY}
-    )
+    table.put_item(Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY})
 
     response = h.handler(api_event(f"GET /animals/{ULID}"), None)
 
@@ -49,15 +45,14 @@ def test_list_animals_empty_herd_returns_empty_list(table):
     assert json.loads(response["body"]) == {"animals": []}
 
 
-
 def test_list_animals_omits_table_attributes(table):
-    table.put_item(
-        Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY}
-    )
+    table.put_item(Item={"pk": f"ANIMAL#{ULID}", "sk": "PROFILE", "entity": "animal", "id": ULID, **BODY})
 
     response = h.handler(api_event("GET /animals"), None)
 
-    assert json.loads(response["body"]) == {"animals": [{"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY}]}
+    assert json.loads(response["body"]) == {
+        "animals": [{"id": ULID, **BODY, **PARENTS_UNSET, **FLAGS_UNSET, **CATEGORY}]
+    }
 
 
 def generate_get_animals_api_event(*statuses):

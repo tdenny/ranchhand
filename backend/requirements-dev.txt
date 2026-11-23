@@ -2,3 +2,4 @@
 boto3
 pytest
 moto[dynamodb]
+ruff~=0.17.0

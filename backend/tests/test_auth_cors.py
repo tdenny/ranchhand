@@ -78,11 +78,14 @@ def cors_origin(monkeypatch):
 
 
 def test_preflight_succeeds_without_token(cors_origin):
-    event = api_event("OPTIONS /animals", headers={
-        "origin": ORIGIN,
-        "access-control-request-method": "GET",
-        "access-control-request-headers": "authorization",
-    })
+    event = api_event(
+        "OPTIONS /animals",
+        headers={
+            "origin": ORIGIN,
+            "access-control-request-method": "GET",
+            "access-control-request-headers": "authorization",
+        },
+    )
 
     response = h.handler(event, None)
 

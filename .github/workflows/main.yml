@@ -7,6 +7,7 @@ on:
       - "backend/src/**"
       - "backend/tests/**"
       - "backend/requirements*.txt"
+      - "ruff.toml"
       - ".github/workflows/**"
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - "backend/src/**"
       - "backend/tests/**"
       - "backend/requirements*.txt"
+      - "ruff.toml"
       - ".github/workflows/**"
   workflow_dispatch:
 
@@ -33,6 +35,25 @@ defaults:
     shell: bash
 
 jobs:
+  lint-python:
+    name: "Lint Python"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Install ruff
+        run: pip install "$(grep '^ruff' backend/requirements-dev.txt)"
+
+      - name: Lint
+        run: ruff check --output-format=github .
+
+      - name: Format check
+        run: ruff format --check .
+
   unit-tests:
     name: "Unit tests"
     runs-on: ubuntu-latest
@@ -54,7 +75,7 @@ jobs:
 
   terraform-plan:
     name: "Terraform Plan"
-    needs: unit-tests
+    needs: [lint-python, unit-tests]
     # Fork PRs do not get an OIDC token, so skip them.
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -116,7 +137,7 @@ jobs:
 
   terraform-apply:
     name: "Terraform Apply"
-    needs: unit-tests
+    needs: [lint-python, unit-tests]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
