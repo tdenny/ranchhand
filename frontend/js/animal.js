@@ -66,6 +66,11 @@ async function addParent(label, parentId) {
   }
 }
 
+// A female in one of these states; the same rules as TRANSITIONS in backend/src/ranchhand/models.py,
+// which is what actually enforces them.
+const femaleIn = (...states) => (animal) => animal.sex === "female" && states.includes(animal.breeding_state);
+const BRED_OR_PREGNANT = femaleIn("bred", "pregnant");
+
 // The events that can be recorded from this page, which endpoint takes each, and when it applies to an animal.
 const ACTIONS = [
   {
@@ -75,7 +80,7 @@ const ACTIONS = [
     done: "Castration recorded.",
     applies: (animal) => animal.sex === "male" && !animal.castrated,
   },
-  // A cow is bred and calves again and again, so these stay available once recorded.
+  // A cow is bred again and again, whatever state she is in.
   {
     type: "bred",
     create: createBreedingEvent,
@@ -83,34 +88,35 @@ const ACTIONS = [
     done: "Breeding recorded.",
     applies: (animal) => animal.sex === "female",
   },
+  // A recheck of a pregnant cow is fine too, so she can be confirmed pregnant again (with a new due date).
   {
     type: "confirmed_pregnant",
     create: createBreedingEvent,
     label: "Confirm pregnant",
     done: "Pregnancy recorded.",
     dueDate: true,
-    applies: (animal) => animal.sex === "female",
+    applies: BRED_OR_PREGNANT,
   },
   {
     type: "confirmed_open",
     create: createBreedingEvent,
     label: "Confirm open",
     done: "Open check recorded.",
-    applies: (animal) => animal.sex === "female",
+    applies: BRED_OR_PREGNANT,
   },
   {
     type: "calved",
     create: createBreedingEvent,
     label: "Record calving",
     done: "Calving recorded.",
-    applies: (animal) => animal.sex === "female",
+    applies: BRED_OR_PREGNANT,
   },
   {
     type: "lost",
     create: createBreedingEvent,
     label: "Record loss",
     done: "Loss recorded.",
-    applies: (animal) => animal.sex === "female",
+    applies: femaleIn("pregnant"),
   },
 ];
 

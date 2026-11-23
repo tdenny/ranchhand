@@ -55,21 +55,28 @@ async function record(buttonLabel, date) {
   await waitFor(() => posts().length === 1 && /recorded/.test($("#action-status").textContent), "the save");
 }
 
-test("a female gets the breeding buttons but no castration button", async () => {
+const BRED_BUTTONS = ["Record breeding", "Confirm pregnant", "Confirm open", "Record calving"];
+const PREGNANT_BUTTONS = [...BRED_BUTTONS, "Record loss"];
+
+// The tests below run in order and share the page, so each one starts in the state the last one left.
+
+test("a cow that has never been bred can only be bred, not checked, calved or lost", async () => {
   await waitFor(() => actionButtons().length, "the action buttons");
 
-  assert.deepEqual(labels(), ["Record breeding", "Confirm pregnant", "Confirm open", "Record calving", "Record loss"]);
+  assert.deepEqual(labels(), ["Record breeding"]);
   assert.equal($("#action-form").hidden, true);
   assert.equal(category(), "Heifer");
 });
 
-test("recording breeding posts a bred event and the heifer becomes a cow", async () => {
+test("recording breeding posts a bred event, the heifer becomes a cow and the checks open up", async () => {
   await record("Record breeding", "2026-05-01");
 
   assert.deepEqual(posts()[0].body, { type: "bred", date: "2026-05-01", notes: null });
+  assert.equal(posts()[0].pathname, "/animals/01COW/breeding-events");
   assert.equal($("#action-status").textContent, "Breeding recorded.");
   assert.equal($("#event-list").children[0].textContent, "Bred2026-05-01");
   assert.equal(category(), "Cow");
+  assert.deepEqual(labels(), BRED_BUTTONS, "a bred cow can be checked or calve, but not lose a pregnancy");
 });
 
 test("confirming a pregnancy posts the due date, and the profile shows the new state", async () => {
@@ -81,43 +88,53 @@ test("confirming a pregnancy posts the due date, and the profile shows the new s
   $("#action-form").requestSubmit();
   await waitFor(() => posts().length === 1 && /recorded/.test($("#action-status").textContent), "the save");
 
-  assert.equal(posts()[0].pathname, "/animals/01COW/breeding-events");
   assert.deepEqual(posts()[0].body, { type: "confirmed_pregnant", date: "2026-05-20", notes: null, due_date: "2027-02-01" });
   assert.equal($("#action-status").textContent, "Pregnancy recorded.");
   assert.equal($("#event-list").children[0].textContent, "Confirmed pregnant2026-05-20 · due 2027-02-01");
   assert.deepEqual(detailRows(), { Breeding: "Pregnant", Due: "2027-02-01" });
+  assert.deepEqual(labels(), PREGNANT_BUTTONS, "only a pregnant cow can lose a pregnancy");
 });
 
-test("a pregnancy can be confirmed without a due date, which is then left out of the request", async () => {
+test("a pregnant cow can be confirmed pregnant again; no due date is left out of the request", async () => {
   await record("Confirm pregnant", "2026-06-01");
 
   assert.deepEqual(posts()[0].body, { type: "confirmed_pregnant", date: "2026-06-01", notes: null });
 });
 
-test("only confirming a pregnancy offers a due date", async () => {
-  for (const label of ["Record breeding", "Confirm open", "Record calving", "Record loss"]) {
+test("only confirming a pregnancy offers a due date", () => {
+  for (const label of PREGNANT_BUTTONS) {
     actionButtons().find((b) => b.textContent === label).click();
-    assert.equal($("#action-due-field").hidden, true, label);
+    assert.equal($("#action-due-field").hidden, label !== "Confirm pregnant", label);
   }
 });
 
-test("confirming open posts a confirmed_open event", async () => {
-  await record("Confirm open", "2026-08-01");
-
-  assert.deepEqual(posts()[0].body, { type: "confirmed_open", date: "2026-08-01", notes: null });
-  assert.equal($("#event-list").children[0].textContent, "Confirmed open2026-08-01");
-  assert.deepEqual(detailRows(), { Breeding: "Open" });
-});
-
-test("calving and loss post to the breeding endpoint", async () => {
-  await record("Record calving", "2026-11-10");
-  assert.deepEqual(posts()[0].body, { type: "calved", date: "2026-11-10", notes: null });
-  assert.equal(posts()[0].pathname, "/animals/01COW/breeding-events");
-  assert.equal($("#action-status").textContent, "Calving recorded.");
-  assert.equal($("#event-list").children[0].textContent, "Calved2026-11-10");
-
+test("recording a loss posts a lost event and the cow can only be bred again", async () => {
   await record("Record loss", "2026-11-12");
+
   assert.deepEqual(posts()[0].body, { type: "lost", date: "2026-11-12", notes: null });
   assert.equal($("#action-status").textContent, "Loss recorded.");
   assert.equal($("#event-list").children[0].textContent, "Lost pregnancy2026-11-12");
+  assert.deepEqual(detailRows(), { Breeding: "Open" });
+  assert.deepEqual(labels(), ["Record breeding"]);
+});
+
+test("confirming open posts a confirmed_open event and the cow can only be bred again", async () => {
+  await record("Record breeding", "2026-12-01");
+  await record("Confirm open", "2027-01-15");
+
+  assert.deepEqual(posts()[0].body, { type: "confirmed_open", date: "2027-01-15", notes: null });
+  assert.equal($("#event-list").children[0].textContent, "Confirmed open2027-01-15");
+  assert.deepEqual(detailRows(), { Breeding: "Open" });
+  assert.deepEqual(labels(), ["Record breeding"]);
+});
+
+test("recording calving posts a calved event and the cow is open", async () => {
+  await record("Record breeding", "2027-02-01");
+  await record("Record calving", "2027-11-10");
+
+  assert.deepEqual(posts()[0].body, { type: "calved", date: "2027-11-10", notes: null });
+  assert.equal($("#action-status").textContent, "Calving recorded.");
+  assert.equal($("#event-list").children[0].textContent, "Calved2027-11-10");
+  assert.deepEqual(detailRows(), { Breeding: "Open" });
+  assert.deepEqual(labels(), ["Record breeding"]);
 });
