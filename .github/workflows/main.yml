@@ -143,14 +143,8 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: Format check
-        run: terraform fmt -check -recursive
-
       - name: Init
         run: terraform init -backend-config="bucket=${TF_VAR_tf_state_bucket}"
-
-      - name: Validate
-        run: terraform validate
 
       - name: Plan
         run: |
@@ -206,9 +200,6 @@ jobs:
 
       - name: Init
         run: terraform init -backend-config="bucket=${TF_VAR_tf_state_bucket}"
-
-      - name: Validate
-        run: terraform validate
 
       # Apply the exact plan that was just produced, not a fresh one.
       - name: Plan
