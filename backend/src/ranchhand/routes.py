@@ -3,8 +3,8 @@ import os
 from typing import Annotated, get_args
 
 from aws_lambda_powertools.event_handler import APIGatewayHttpResolver, CORSConfig, Response
-from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+from aws_lambda_powertools.event_handler.middlewares import NextMiddleware
 from aws_lambda_powertools.event_handler.openapi.exceptions import RequestValidationError
 from aws_lambda_powertools.event_handler.openapi.params import Query
 
