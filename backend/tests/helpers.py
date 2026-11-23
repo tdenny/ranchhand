@@ -6,10 +6,12 @@ TOKEN = "test-token"
 
 BODY = {"number": "101", "status": "active", "sex": "female", "date_of_birth": "2020-04-01"}
 PARENTS_UNSET = {"sire_id": None, "dam_id": None}
-FLAGS_UNSET = {"castrated": False, "bred": False}
+FLAGS_UNSET = {"castrated": False, "breeding_state": "unbred", "due_date": None}
 # What BODY (a cow-aged female not yet bred) is called on TODAY.
 CATEGORY = {"category": "Heifer"}
 EVENT_BODY = {"type": "note", "date": "2024-05-01", "notes": "annual booster"}
+EVENT_UNSET = {"due_date": None}
+BREEDING_BODY = {"type": "bred", "date": "2024-05-01", "notes": "AI"}
 
 
 def api_event(route_key="POST /animals", **fields):
