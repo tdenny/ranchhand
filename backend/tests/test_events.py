@@ -26,9 +26,7 @@ def test_create_animal_event_writes_event_item(table):
 
 def test_create_animal_event_returns_201(table):
     h.handler(api_event(body=json.dumps(BODY)), None)
-    response = h.handler(
-        api_event(f"POST /animals/{ULID}/events", body=json.dumps(EVENT_BODY)), None
-    )
+    response = h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps(EVENT_BODY)), None)
 
     assert response["statusCode"] == 201
     assert response["headers"]["location"] == f"/animals/{ULID}/events/{ULID}"
@@ -36,9 +34,7 @@ def test_create_animal_event_returns_201(table):
 
 
 def test_create_animal_event_unknown_animal_returns_404(table):
-    response = h.handler(
-        api_event("POST /animals/nope/events", body=json.dumps(EVENT_BODY)), None
-    )
+    response = h.handler(api_event("POST /animals/nope/events", body=json.dumps(EVENT_BODY)), None)
 
     assert response["statusCode"] == 404
     assert table.scan()["Items"] == []
@@ -46,9 +42,7 @@ def test_create_animal_event_unknown_animal_returns_404(table):
 
 def test_create_animal_event_invalid_body_returns_400(table):
     h.handler(api_event(body=json.dumps(BODY)), None)
-    response = h.handler(
-        api_event(f"POST /animals/{ULID}/events", body=json.dumps({"type": "x"})), None
-    )
+    response = h.handler(api_event(f"POST /animals/{ULID}/events", body=json.dumps({"type": "x"})), None)
 
     assert response["statusCode"] == 400
 
@@ -78,14 +72,16 @@ def test_create_animal_event_unknown_type_returns_400_without_writing(table, eve
 
 
 def put_event(table, animal_id, event_id, **fields):
-    table.put_item(Item={
-        "pk": f"ANIMAL#{animal_id}",
-        "sk": f"EVENT#{event_id}",
-        "entity": "event",
-        "id": event_id,
-        "animal_id": animal_id,
-        **{**EVENT_BODY, **fields},
-    })
+    table.put_item(
+        Item={
+            "pk": f"ANIMAL#{animal_id}",
+            "sk": f"EVENT#{event_id}",
+            "entity": "event",
+            "id": event_id,
+            "animal_id": animal_id,
+            **{**EVENT_BODY, **fields},
+        }
+    )
 
 
 def test_list_animal_events_returns_events_newest_first(table):
