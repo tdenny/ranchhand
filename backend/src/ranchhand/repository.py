@@ -104,12 +104,15 @@ class HerdRepository:
         event: Event,
         from_states: frozenset[BreedingState] | None,
         to_state: BreedingState,
+        calf: Animal | None = None,
     ) -> None:
         """Store a breeding event and move the animal to to_state, clearing its due date unless the event has one.
 
-        Both happen in one transaction, which also requires the animal to be in one of from_states (None:
+        A calf, if given, is stored as a new animal in the same transaction. All of it happens in one
+        transaction, which also requires the animal to be in one of from_states (None:
         any) when it commits, so a change since the caller read the animal can't slip past. Raises
-        ClientError (TransactionCanceledException) if it isn't, if it doesn't exist, or if the event id is taken.
+        ClientError (TransactionCanceledException) if it isn't, if it doesn't exist, or if the event or calf
+        id is taken.
         """
         values = {":to": to_state}
         update = "SET breeding_state = :to"
@@ -133,6 +136,7 @@ class HerdRepository:
                 "ConditionExpression": condition,
                 "ExpressionAttributeValues": values,
             },
+            extra_puts=[self._animal_item(calf)] if calf is not None else [],
         )
 
     @staticmethod
@@ -144,16 +148,20 @@ class HerdRepository:
             **event.model_dump(mode="json"),
         }
 
-    def _write_event_and_profile(self, event_item: dict, profile_update: dict) -> None:
+    def _write_event_and_profile(self, event_item: dict, profile_update: dict, extra_puts: list[dict] = ()) -> None:
+        """Write the event and the profile update, and any other new items, as one transaction."""
         self._table.meta.client.transact_write_items(
             TransactItems=[
-                {
-                    "Put": {
-                        "TableName": self._table.name,
-                        "Item": event_item,
-                        "ConditionExpression": "attribute_not_exists(pk)",
+                *(
+                    {
+                        "Put": {
+                            "TableName": self._table.name,
+                            "Item": item,
+                            "ConditionExpression": "attribute_not_exists(pk)",
+                        }
                     }
-                },
+                    for item in (event_item, *extra_puts)
+                ),
                 {"Update": {"TableName": self._table.name, **profile_update}},
             ]
         )
