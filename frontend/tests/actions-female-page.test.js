@@ -132,9 +132,16 @@ test("recording calving posts a calved event and the cow is open", async () => {
   await record("Record breeding", "2027-02-01");
   await record("Record calving", "2027-11-10");
 
-  assert.deepEqual(posts()[0].body, { type: "calved", date: "2027-11-10", notes: null });
+  // A calf is added too, with its sex not known yet.
+  assert.deepEqual(posts()[0].body, { type: "calved", date: "2027-11-10", notes: null, calf: {} });
   assert.equal($("#action-status").textContent, "Calving recorded.");
   assert.equal($("#event-list").children[0].textContent, "Calved2027-11-10");
   assert.deepEqual(detailRows(), { Breeding: "Open" });
   assert.deepEqual(labels(), ["Record breeding"]);
+});
+
+test("only calving adds a calf", async () => {
+  await record("Record breeding", "2028-02-01");
+
+  assert.equal(posts()[0].body.calf, undefined);
 });
