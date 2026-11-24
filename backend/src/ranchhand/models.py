@@ -14,7 +14,7 @@ LogEventType = Literal["castrated", "weaned", "note"]
 # A pregnancy check is recorded as what it found, so each outcome is its own event type.
 BreedingEventType = Literal["bred", "confirmed_pregnant", "confirmed_open", "calved", "lost"]
 EventType = Literal["castrated", "weaned", "note", "bred", "confirmed_pregnant", "confirmed_open", "calved", "lost"]
-Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf"]
+Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf", "Calf"]
 
 GESTATION_DAYS = 283
 
@@ -80,7 +80,8 @@ class AnimalIn(BaseModel):
 
     number: str
     status: Status
-    sex: Sex
+    # Unknown (null) only for a calf born at a calving whose sex isn't known yet; POST /animals refuses it.
+    sex: Sex | None
     date_of_birth: date | None = None
     sire_id: str | None = None
     dam_id: str | None = None
@@ -113,6 +114,8 @@ class AnimalIn(BaseModel):
 class Animal(AnimalIn):
     """An animal as stored and returned by the API."""
 
+    # Unset sex isn't stored (None is omitted from the item), so reading it back needs a default.
+    sex: Sex | None = None
     # The lambda looks up new_ulid at call time so tests can patch it.
     id: str = Field(default_factory=lambda: new_ulid())
 
@@ -123,7 +126,9 @@ class Animal(AnimalIn):
         if self.date_of_birth is None:
             return None
         if is_calf(self.date_of_birth, today()):
-            return "Bull calf" if self.sex == "male" else "Heifer calf"
+            return {"male": "Bull calf", "female": "Heifer calf"}.get(self.sex, "Calf")
+        if self.sex is None:
+            return None
         if self.sex == "male":
             return "Steer" if self.castrated else "Bull"
         return "Heifer" if self.breeding_state == "unbred" else "Cow"
@@ -143,6 +148,13 @@ class EventIn(BaseModel):
     notes: str | None = None
 
 
+class CalfIn(BaseModel):
+    """The calf born at a calving. It has no ear tag yet, so the server numbers it after its dam."""
+
+    # Often not known until later; it can be set by editing the animal.
+    sex: Sex | None = None
+
+
 class BreedingEventIn(BaseModel):
     """Request body for POST /animals/<animal_id>/breeding-events."""
 
@@ -151,11 +163,15 @@ class BreedingEventIn(BaseModel):
     notes: str | None = None
     # Only for a confirmed pregnancy.
     due_date: date | None = None
+    # Only for a calving. Creates the calf animal along with the event.
+    calf: CalfIn | None = None
 
     @model_validator(mode="after")
     def check_field_combinations(self) -> Self:
         if self.due_date is not None and self.type != "confirmed_pregnant":
             raise ValueError("due_date is only for a confirmed pregnancy")
+        if self.calf is not None and self.type != "calved":
+            raise ValueError("calf is only for a calving")
         return self
 
     @property

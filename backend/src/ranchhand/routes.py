@@ -132,8 +132,12 @@ def breeding_state_errors(animal_in: AnimalIn, current: Animal) -> list[dict]:
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
+    errors = invalid_parent_errors(animal_in)
+    if animal_in.sex is None:
+        # Allowed on the model only for a calf created by a calving, which isn't built from a request body.
+        errors.append({"type": "enum", "loc": ["body", "sex"], "msg": "Input should be 'female' or 'male'"})
     # The new animal's id is generated here, so it can never be its own parent.
-    if errors := invalid_parent_errors(animal_in):
+    if errors:
         # Handled by invalid_request(), so these look like any other validation failure.
         raise RequestValidationError(errors)
 
@@ -236,10 +240,20 @@ def create_animal_breeding_event(animal_id: str, event_in: BreedingEventIn) -> R
     if error:
         raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": error}])
 
-    event = Event(animal_id=animal_id, **event_in.model_dump())
+    event = Event(animal_id=animal_id, **event_in.model_dump(exclude={"calf"}))
     if event.type == "confirmed_pregnant" and event.due_date is None:
         event.due_date = default_due_date(repo.list_events(animal_id), event.date)
-    repo.put_breeding_event(event, transition.from_states, transition.to_state)
+    calf = None
+    if event_in.calf is not None:
+        # Calves get their ear tag weeks later; until then the number says whose calf it is.
+        calf = Animal(
+            number=f"{animal.number}'s calf",
+            status="active",
+            sex=event_in.calf.sex,
+            date_of_birth=event.date,
+            dam_id=animal_id,
+        )
+    repo.put_breeding_event(event, transition.from_states, transition.to_state, calf)
 
     return Response(
         status_code=201,

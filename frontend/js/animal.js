@@ -109,6 +109,9 @@ const ACTIONS = [
     create: createBreedingEvent,
     label: "Record calving",
     done: "Calving recorded.",
+    // The API adds the calf to the herd, numbered after its dam until it gets an ear tag. Its sex
+    // isn't asked for, since it often isn't known yet; it is set later by editing the calf.
+    calf: true,
     applies: BRED_OR_PREGNANT,
   },
   {
@@ -156,7 +159,7 @@ function renderProfile(animal) {
   detailsEl.replaceChildren();
   // Unknown (null) when there is no date of birth, which is also when the sex stands in on the list.
   if (animal.category) addDetail("Category", animal.category);
-  addDetail("Sex", animal.sex);
+  addDetail("Sex", animal.sex ?? "Unknown");
   addDetail("Status", animal.status);
   addDetail("Date of birth", animal.date_of_birth ?? "Unknown");
   // Only females have a breeding state, and only a pregnant one may have a due date.
@@ -302,6 +305,7 @@ actionFormEl.addEventListener("submit", async (submitEvent) => {
       date,
       notes: notes.trim() || null,
       ...(action.dueDate && dueDate && { due_date: dueDate }),
+      ...(action.calf && { calf: {} }),
     });
     eventListEl.prepend(eventItem(event));
     showStatus(eventsStatusEl, "");

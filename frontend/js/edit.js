@@ -79,7 +79,11 @@ function showFlagFields() {
 async function fillForm(animal) {
   const { elements } = formEl;
   elements.number.value = animal.number;
-  elements.sex.value = animal.sex;
+  // Only a calf whose sex isn't known yet may be saved without one.
+  const sexUnknown = animal.sex === null;
+  elements.sex.required = !sexUnknown;
+  elements.sex.querySelector("option[value='']").disabled = !sexUnknown;
+  elements.sex.value = animal.sex ?? "";
 
   // External animals are made on their own page, and the add form doesn't offer the status, so
   // only an animal that already is external gets it as an option (and may lack a date of birth).
@@ -149,7 +153,7 @@ formEl.addEventListener("submit", async (event) => {
     // The whole animal is sent, so cleared fields (no parent, no date of birth) are cleared.
     const animal = await updateAnimal(animalId, {
       number: elements.number.value,
-      sex: elements.sex.value,
+      sex: elements.sex.value || null,
       status: elements.status.value,
       date_of_birth: elements.date_of_birth.value || null,
       sire_id: elements.sire_id.value,

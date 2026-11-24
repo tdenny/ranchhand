@@ -23,7 +23,7 @@ function animalItem(animal) {
 
   const details = document.createElement("div");
   details.className = "details";
-  details.textContent = `${animal.category ?? animal.sex} · ${animal.status} · born ${animal.date_of_birth ?? "unknown"}`;
+  details.textContent = `${animal.category ?? animal.sex ?? "sex unknown"} · ${animal.status} · born ${animal.date_of_birth ?? "unknown"}`;
 
   item.append(number, details);
   return item;
