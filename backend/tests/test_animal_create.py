@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from helpers import BODY, CATEGORY, FLAGS_UNSET, PARENTS_UNSET, ULID, api_event
+from helpers import BODY, CATEGORY, FLAGS_UNSET, PARENTS_UNSET, TODAY, ULID, api_event
 
 from ranchhand import handler as h
 
@@ -162,3 +162,12 @@ def test_create_animal_invalid_date_of_birth_returns_400_without_writing(table):
     errors = json.loads(response["body"])["errors"]
     assert [e["loc"] for e in errors] == [["body", "date_of_birth"]]
     assert table.scan()["Items"] == []
+
+
+def test_calf_of_unknown_sex_is_called_a_calf():
+    from ranchhand.models import Animal
+
+    calf = Animal(number="26's calf", status="active", date_of_birth=TODAY, dam_id="D")
+    assert calf.category == "Calf"
+    adult = Animal(number="9", status="active", date_of_birth="2010-01-01")
+    assert adult.category is None

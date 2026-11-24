@@ -179,3 +179,18 @@ def test_update_animal_cannot_make_a_bred_cow_male(table):
 
     assert response["statusCode"] == 400
     assert [e["loc"] for e in json.loads(response["body"])["errors"]] == [["body", "breeding_state"]]
+
+
+def test_update_animal_can_set_the_sex_of_a_calf_whose_sex_was_unknown(table):
+    put_animal(table, ULID, sex=None, date_of_birth="2026-11-01", breeding_state=None)
+    unknown = {**BODY, "sex": None, "date_of_birth": "2026-11-01"}
+
+    response = h.handler(update_event(ULID, {**unknown, "number": "212"}), None)  # retagged, sex still unknown
+
+    assert response["statusCode"] == 200
+    assert stored_state(table) == (None, None)
+
+    response = h.handler(update_event(ULID, {**unknown, "number": "212", "sex": "female"}), None)
+
+    assert response["statusCode"] == 200
+    assert stored_state(table) == ("unbred", None)

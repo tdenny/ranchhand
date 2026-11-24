@@ -260,3 +260,85 @@ def test_breeding_event_for_a_missing_profile_writes_no_event(table):
 
     assert raised.value.response["Error"]["Code"] == "TransactionCanceledException"
     assert table.scan()["Items"] == []
+
+
+@pytest.fixture
+def ids(monkeypatch):
+    """Hand out distinct ids (the event first, then the calf), since the cow already has ULID."""
+    queue = iter(["EVENT", "CALF"])
+    monkeypatch.setattr(models, "new_ulid", lambda: next(queue))
+
+
+@pytest.mark.parametrize("sex, state", [("male", None), ("female", "unbred")])
+def test_calving_with_a_calf_creates_it_in_the_herd(table, ids, sex, state):
+    put_animal(table, ULID, number="26", breeding_state="pregnant", due_date="2024-05-01")
+
+    response = post_breeding("calved", calf={"sex": sex})
+
+    assert response["statusCode"] == 201
+    assert "calf" not in json.loads(response["body"])
+    assert profile(table)["breeding_state"] == "open"
+    calf = profile(table, "CALF")
+    assert {k: calf.get(k) for k in ("number", "status", "sex", "date_of_birth", "dam_id", "breeding_state")} == {
+        "number": "26's calf",
+        "status": "active",
+        "sex": sex,
+        "date_of_birth": "2024-05-01",
+        "dam_id": ULID,
+        "breeding_state": state,
+    }
+
+
+def test_calving_without_a_calf_creates_none(table, ids):
+    put_animal(table, ULID, breeding_state="pregnant", due_date="2024-05-01")
+
+    assert post_breeding("calved")["statusCode"] == 201
+    assert len(table.scan()["Items"]) == 2  # the cow and the event
+
+
+@pytest.mark.parametrize("event_type", ["bred", "confirmed_pregnant", "confirmed_open", "lost"])
+def test_calf_on_anything_but_a_calving_returns_400_without_writing(table, event_type):
+    put_animal(table, ULID, breeding_state="pregnant")
+    before = table.scan()["Items"]
+
+    response = post_breeding(event_type, calf={"sex": "male"})
+
+    assert response["statusCode"] == 400
+    assert errors(response) == [(["body"], "Value error, calf is only for a calving")]
+    assert table.scan()["Items"] == before
+
+
+def test_calf_with_an_invalid_sex_returns_400_without_writing(table):
+    put_animal(table, ULID, breeding_state="pregnant")
+    before = table.scan()["Items"]
+
+    assert post_breeding("calved", calf={"sex": "steer"})["statusCode"] == 400
+    assert table.scan()["Items"] == before
+
+
+def test_a_taken_calf_id_rolls_back_the_calving(table, ids):
+    put_animal(table, ULID, breeding_state="pregnant", due_date="2024-05-01")
+    put_animal(table, "CALF")
+    before = table.scan()["Items"]
+
+    with pytest.raises(ClientError) as raised:
+        post_breeding("calved", calf={"sex": "male"})
+
+    assert raised.value.response["Error"]["Code"] == "TransactionCanceledException"
+    assert sorted(table.scan()["Items"], key=lambda i: i["pk"]) == sorted(before, key=lambda i: i["pk"])
+
+
+def test_calving_with_a_calf_of_unknown_sex_creates_it_without_one(table, ids):
+    put_animal(table, ULID, number="26", breeding_state="pregnant", due_date="2024-05-01")
+
+    assert post_breeding("calved", date="2026-11-01", calf={})["statusCode"] == 201
+
+    calf = profile(table, "CALF")
+    assert "sex" not in calf and "breeding_state" not in calf
+    assert calf["number"] == "26's calf"
+    assert calf["dam_id"] == ULID
+    # Readable, and in the status index (so it is listed).
+    body = json.loads(h.handler(api_event("GET /animals/CALF"), None)["body"])
+    assert body["sex"] is None and body["category"] == "Calf"
+    listed = json.loads(h.handler(api_event("GET /animals"), None)["body"])["animals"]
+    assert "CALF" in [a["id"] for a in listed]
