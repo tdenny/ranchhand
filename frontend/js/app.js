@@ -7,6 +7,19 @@ import { askForToken } from "./auth.js";
 
 const statusEl = document.querySelector("#status");
 const listEl = document.querySelector("#animal-list");
+const filtersEl = document.querySelector("#filters");
+
+// The quick filters shown above the list. To add one, add an entry here: `matches` gets an animal as the API returns it.
+const FILTERS = [
+  { label: "All", matches: () => true },
+  { label: "Calves", matches: (animal) => animal.category?.endsWith("calf") ?? false },
+  { label: "Open cows", matches: (animal) => animal.category === "Cow" && animal.breeding_state === "open" },
+  { label: "Pregnant cows", matches: (animal) => animal.category === "Cow" && animal.breeding_state === "pregnant" },
+  { label: "Steers", matches: (animal) => animal.category === "Steer" },
+];
+
+let animals = [];
+let activeFilter = FILTERS[0];
 
 function showStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -29,6 +42,30 @@ function animalItem(animal) {
   return item;
 }
 
+function renderList() {
+  const shown = animals.filter(activeFilter.matches);
+  listEl.replaceChildren(...shown.map(animalItem));
+  if (!animals.length) showStatus("No animals yet.");
+  else showStatus(shown.length ? "" : `No animals match “${activeFilter.label}”.`);
+  for (const button of filtersEl.children) {
+    button.setAttribute("aria-pressed", String(button.textContent === activeFilter.label));
+  }
+}
+
+function renderFilters() {
+  filtersEl.replaceChildren(...FILTERS.map((filter) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "filter";
+    button.textContent = filter.label;
+    button.addEventListener("click", () => {
+      activeFilter = filter;
+      renderList();
+    });
+    return button;
+  }));
+}
+
 async function load() {
   listEl.replaceChildren();
 
@@ -39,9 +76,8 @@ async function load() {
 
   showStatus("Loading…");
   try {
-    const animals = await listAnimals();
-    listEl.replaceChildren(...animals.map(animalItem));
-    showStatus(animals.length ? "" : "No animals yet.");
+    animals = await listAnimals();
+    renderList();
   } catch (error) {
     const message = error instanceof UnauthorizedError
       ? "Token rejected. Use “Set token” to try another."
@@ -51,7 +87,9 @@ async function load() {
 }
 
 document.querySelector("#token-button").addEventListener("click", () => {
-  if (askForToken()) load();
+  if (askForToken()) renderFilters();
+load();
 });
 
+renderFilters();
 load();
