@@ -2,12 +2,14 @@ import {
   NotFoundError,
   UnauthorizedError,
   ValidationError,
+  createBreedingEvent,
   createEvent,
   getAnimal,
   getToken,
   listAnimalEvents,
 } from "./api.js";
 import { askForToken } from "./auth.js";
+import { BREEDING_LABELS, eventLabel } from "./labels.js";
 
 const animalId = new URLSearchParams(window.location.search).get("id");
 
@@ -20,10 +22,10 @@ const eventsStatusEl = document.querySelector("#events-status");
 const eventListEl = document.querySelector("#event-list");
 const formEl = document.querySelector("#event-form");
 const formStatusEl = document.querySelector("#form-status");
-const milestoneActionsEl = document.querySelector("#milestone-actions");
-const milestoneFormEl = document.querySelector("#milestone-form");
-const milestoneTitleEl = document.querySelector("#milestone-title");
-const milestoneStatusEl = document.querySelector("#milestone-status");
+const actionsEl = document.querySelector("#actions");
+const actionFormEl = document.querySelector("#action-form");
+const actionTitleEl = document.querySelector("#action-title");
+const actionStatusEl = document.querySelector("#action-status");
 
 function showStatus(el, message, isError = false) {
   el.textContent = message;
@@ -64,57 +66,89 @@ async function addParent(label, parentId) {
   }
 }
 
-// The milestones that can be recorded from this page, and when each one applies to an animal.
-const MILESTONE_ACTIONS = [
+// A female in one of these states; the same rules as TRANSITIONS in backend/src/ranchhand/models.py,
+// which is what actually enforces them.
+const femaleIn = (...states) => (animal) => animal.sex === "female" && states.includes(animal.breeding_state);
+const BRED_OR_PREGNANT = femaleIn("bred", "pregnant");
+
+// The events that can be recorded from this page, which endpoint takes each, and when it applies to an animal.
+const ACTIONS = [
   {
     type: "castrated",
+    create: createEvent,
     label: "Record castration",
     done: "Castration recorded.",
     applies: (animal) => animal.sex === "male" && !animal.castrated,
   },
-  // A cow is bred and calves again and again, so these stay available once recorded.
+  // A cow is bred again and again, whatever state she is in.
   {
     type: "bred",
+    create: createBreedingEvent,
     label: "Record breeding",
     done: "Breeding recorded.",
     applies: (animal) => animal.sex === "female",
   },
+  // A recheck of a pregnant cow is fine too, so she can be confirmed pregnant again (with a new due date).
+  {
+    type: "confirmed_pregnant",
+    create: createBreedingEvent,
+    label: "Confirm pregnant",
+    done: "Pregnancy recorded.",
+    dueDate: true,
+    applies: BRED_OR_PREGNANT,
+  },
+  {
+    type: "confirmed_open",
+    create: createBreedingEvent,
+    label: "Confirm open",
+    done: "Open check recorded.",
+    applies: BRED_OR_PREGNANT,
+  },
   {
     type: "calved",
+    create: createBreedingEvent,
     label: "Record calving",
     done: "Calving recorded.",
-    applies: (animal) => animal.sex === "female",
+    applies: BRED_OR_PREGNANT,
+  },
+  {
+    type: "lost",
+    create: createBreedingEvent,
+    label: "Record loss",
+    done: "Loss recorded.",
+    applies: femaleIn("pregnant"),
   },
 ];
 
 let activeAction = null;
 
-function closeMilestoneForm() {
+function closeActionForm() {
   activeAction = null;
-  milestoneFormEl.hidden = true;
+  actionFormEl.hidden = true;
 }
 
-function openMilestoneForm(action) {
+function openActionForm(action) {
   activeAction = action;
-  milestoneTitleEl.textContent = action.label;
-  milestoneFormEl.reset();
-  milestoneFormEl.elements.date.value = today();
-  showStatus(milestoneStatusEl, "");
-  milestoneFormEl.hidden = false;
-  milestoneFormEl.elements.date.focus();
+  actionTitleEl.textContent = action.label;
+  actionFormEl.reset();
+  actionFormEl.elements.date.value = today();
+  document.querySelector("#action-due-field").hidden = !action.dueDate;
+  showStatus(actionStatusEl, "");
+  actionFormEl.hidden = false;
+  actionFormEl.elements.date.focus();
 }
 
-function renderMilestoneActions(animal) {
-  closeMilestoneForm();
-  const buttons = MILESTONE_ACTIONS.filter((action) => action.applies(animal)).map((action) => {
+function renderActions(animal) {
+  closeActionForm();
+  const buttons = ACTIONS.filter((action) => action.applies(animal)).map((action) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "action";
     button.textContent = action.label;
-    button.addEventListener("click", () => openMilestoneForm(action));
+    button.addEventListener("click", () => openActionForm(action));
     return button;
   });
-  milestoneActionsEl.replaceChildren(...buttons);
+  actionsEl.replaceChildren(...buttons);
 }
 
 function renderProfile(animal) {
@@ -125,9 +159,12 @@ function renderProfile(animal) {
   addDetail("Sex", animal.sex);
   addDetail("Status", animal.status);
   addDetail("Date of birth", animal.date_of_birth ?? "Unknown");
+  // Only females have a breeding state, and only a pregnant one may have a due date.
+  if (animal.breeding_state) addDetail("Breeding", BREEDING_LABELS[animal.breeding_state]);
+  if (animal.due_date) addDetail("Due", animal.due_date);
   document.querySelector("#edit-link").href = `edit.html?id=${encodeURIComponent(animal.id)}`;
   profileEl.hidden = false;
-  renderMilestoneActions(animal);
+  renderActions(animal);
 
   // Only the parents that are recorded get a row. Not awaited: they fill in as they arrive.
   if (animal.sire_id) addParent("Sire", animal.sire_id);
@@ -139,11 +176,11 @@ function eventItem(event) {
 
   const heading = document.createElement("div");
   heading.className = "number";
-  heading.textContent = event.type[0].toUpperCase() + event.type.slice(1);
+  heading.textContent = eventLabel(event.type);
 
   const details = document.createElement("div");
   details.className = "details";
-  details.textContent = event.date;
+  details.textContent = event.due_date ? `${event.date} · due ${event.due_date}` : event.date;
 
   item.append(heading, details);
 
@@ -228,7 +265,7 @@ formEl.addEventListener("submit", async (submitEvent) => {
   const { date, notes } = Object.fromEntries(new FormData(formEl));
 
   try {
-    // This form only adds plain notes; milestones such as castration are recorded another way.
+    // This form only adds plain notes; castration and breeding events are recorded with the action buttons.
     const event = await createEvent(animalId, { type: "note", date, notes: notes.trim() || null });
     // The list is newest first, so the new event goes on top.
     eventListEl.prepend(eventItem(event));
@@ -243,44 +280,50 @@ formEl.addEventListener("submit", async (submitEvent) => {
   }
 });
 
-milestoneFormEl.addEventListener("submit", async (submitEvent) => {
+actionFormEl.addEventListener("submit", async (submitEvent) => {
   submitEvent.preventDefault();
 
   if (!getToken() && !askForToken()) {
-    showStatus(milestoneStatusEl, "A token is required to record events.", true);
+    showStatus(actionStatusEl, "A token is required to record events.", true);
     return;
   }
 
   const action = activeAction;
-  const submitButton = milestoneFormEl.querySelector("button[type=submit]");
+  const submitButton = actionFormEl.querySelector("button[type=submit]");
   submitButton.disabled = true;
-  showStatus(milestoneStatusEl, "Saving…");
+  showStatus(actionStatusEl, "Saving…");
 
-  const { date, notes } = Object.fromEntries(new FormData(milestoneFormEl));
+  const { date, notes, due_date: dueDate } = Object.fromEntries(new FormData(actionFormEl));
 
   try {
-    const event = await createEvent(animalId, { type: action.type, date, notes: notes.trim() || null });
+    // Only a confirmed pregnancy takes a due date; left out, the API works one out from the last breeding.
+    const event = await action.create(animalId, {
+      type: action.type,
+      date,
+      notes: notes.trim() || null,
+      ...(action.dueDate && dueDate && { due_date: dueDate }),
+    });
     eventListEl.prepend(eventItem(event));
     showStatus(eventsStatusEl, "");
 
     // The animal changed (its flag, and so its category), so show it again as the API now has it.
     try {
       renderProfile(await getAnimal(animalId));
-      showStatus(milestoneStatusEl, action.done);
+      showStatus(actionStatusEl, action.done);
     } catch {
-      closeMilestoneForm();
-      showStatus(milestoneStatusEl, `${action.done} Reload the page to see the update.`);
+      closeActionForm();
+      showStatus(actionStatusEl, `${action.done} Reload the page to see the update.`);
     }
   } catch (error) {
-    showStatus(milestoneStatusEl, saveErrorMessage(error), true);
+    showStatus(actionStatusEl, saveErrorMessage(error), true);
   } finally {
     submitButton.disabled = false;
   }
 });
 
-document.querySelector("#milestone-cancel").addEventListener("click", () => {
-  closeMilestoneForm();
-  showStatus(milestoneStatusEl, "");
+document.querySelector("#action-cancel").addEventListener("click", () => {
+  closeActionForm();
+  showStatus(actionStatusEl, "");
 });
 
 document.querySelector("#token-button").addEventListener("click", () => {

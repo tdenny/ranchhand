@@ -110,6 +110,25 @@ def invalid_parent_errors(animal_in: AnimalIn, animal_id: str | None = None) -> 
     return errors
 
 
+BREEDING_STATE_LOCKED = "Breeding events change this; it can't be edited"
+
+
+def breeding_state_errors(animal_in: AnimalIn, current: Animal) -> list[dict]:
+    """Return a validation error for each of breeding_state/due_date that an edit would change.
+
+    Once an animal exists they only change by recording a breeding event (see TRANSITIONS). A male
+    has no state, which counts as the same as unbred, so fixing a wrongly entered sex is still allowed.
+    """
+    errors = []
+
+    if (animal_in.breeding_state or "unbred") != (current.breeding_state or "unbred"):
+        errors.append({"type": "value_error", "loc": ["body", "breeding_state"], "msg": BREEDING_STATE_LOCKED})
+    if animal_in.due_date != current.due_date:
+        errors.append({"type": "value_error", "loc": ["body", "due_date"], "msg": BREEDING_STATE_LOCKED})
+
+    return errors
+
+
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
@@ -157,13 +176,16 @@ def get_animal(animal_id: str) -> Response[Animal]:
 
 @app.put("/animals/<animal_id>")
 def update_animal(animal_id: str, animal_in: AnimalIn) -> Response[Animal]:
-    """Replace every editable field of an existing animal; its id (and its events) stay as they were."""
-    repo = get_repository()
+    """Replace every editable field of an existing animal; its id (and its events) stay as they were.
 
-    if not repo.animal_exists(animal_id):
+    The exception is its breeding state and due date, which only breeding events change."""
+    repo = get_repository()
+    current = repo.get_animal(animal_id)
+
+    if current is None:
         raise NotFoundError(f"Animal {animal_id} not found")
 
-    if errors := invalid_parent_errors(animal_in, animal_id):
+    if errors := invalid_parent_errors(animal_in, animal_id) + breeding_state_errors(animal_in, current):
         raise RequestValidationError(errors)
 
     animal = Animal(id=animal_id, **animal_in.model_dump())

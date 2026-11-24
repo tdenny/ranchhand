@@ -6,7 +6,7 @@ import { jsonResponse, loadPage, waitFor } from "./dom.js";
 // The API state: recording a castration flips the flag, as the real transaction does.
 let animal = {
   id: "01BULL", number: "201", sex: "male", status: "active", date_of_birth: "2020-04-01",
-  castrated: false, bred: false, category: "Bull",
+  castrated: false, breeding_state: null, due_date: null, category: "Bull",
 };
 let failNextPost = false;
 let calls = [];
@@ -35,7 +35,7 @@ before(async () => {
 });
 
 const $ = (selector) => window.document.querySelector(selector);
-const actionButtons = () => [...window.document.querySelectorAll("#milestone-actions button")];
+const actionButtons = () => [...window.document.querySelectorAll("#actions button")];
 const posts = () => calls.filter((c) => c.method === "POST");
 const profile = () => {
   const dts = [...window.document.querySelectorAll("#profile-details dt")];
@@ -47,20 +47,20 @@ test("an uncastrated male gets a Record castration button, and the form stays cl
   await waitFor(() => actionButtons().length, "the action button");
 
   assert.deepEqual(actionButtons().map((b) => b.textContent), ["Record castration"], "no breeding or calving for a male");
-  assert.equal($("#milestone-form").hidden, true);
+  assert.equal($("#action-form").hidden, true);
   assert.equal(profile().Category, "Bull");
 });
 
 test("clicking the button opens the form with today's date, and Cancel closes it without saving", () => {
   actionButtons()[0].click();
 
-  assert.equal($("#milestone-form").hidden, false);
-  assert.equal($("#milestone-title").textContent, "Record castration");
-  assert.equal($("#milestone-form").elements.date.value, new Date().toLocaleDateString("en-CA"));
+  assert.equal($("#action-form").hidden, false);
+  assert.equal($("#action-title").textContent, "Record castration");
+  assert.equal($("#action-form").elements.date.value, new Date().toLocaleDateString("en-CA"));
 
-  $("#milestone-cancel").click();
+  $("#action-cancel").click();
 
-  assert.equal($("#milestone-form").hidden, true);
+  assert.equal($("#action-form").hidden, true);
   assert.equal(posts().length, 0);
 });
 
@@ -68,23 +68,23 @@ test("a rejected request shows the API's message and keeps the form open", async
   actionButtons()[0].click();
   failNextPost = true;
 
-  $("#milestone-form").requestSubmit();
-  await waitFor(() => $("#milestone-status").classList.contains("error"), "the error");
+  $("#action-form").requestSubmit();
+  await waitFor(() => $("#action-status").classList.contains("error"), "the error");
 
-  assert.match($("#milestone-status").textContent, /Only male animals can be castrated/);
-  assert.equal($("#milestone-form").hidden, false);
+  assert.match($("#action-status").textContent, /Only male animals can be castrated/);
+  assert.equal($("#action-form").hidden, false);
   assert.equal(actionButtons().length, 1);
   assert.equal($("#event-list").children.length, 0);
 });
 
 test("saving posts the castration, adds it to the events, and shows the animal as a Steer", async () => {
-  const form = $("#milestone-form");
+  const form = $("#action-form");
   form.elements.date.value = "2026-11-01";
   form.elements.notes.value = "  banded  ";
   calls = [];
 
   form.requestSubmit();
-  await waitFor(() => $("#milestone-status").textContent === "Castration recorded.", "success message");
+  await waitFor(() => $("#action-status").textContent === "Castration recorded.", "success message");
 
   assert.deepEqual(posts()[0].body, { type: "castrated", date: "2026-11-01", notes: "banded" });
   assert.equal($("#event-list").children[0].textContent, "Castrated2026-11-01banded");

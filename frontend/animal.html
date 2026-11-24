@@ -21,19 +21,22 @@
 
       <p><a id="edit-link" href="edit.html">Edit animal</a></p>
 
-      <div id="milestone-actions"></div>
-      <form id="milestone-form" hidden>
-        <h3 id="milestone-title"></h3>
+      <div id="actions"></div>
+      <form id="action-form" hidden>
+        <h3 id="action-title"></h3>
         <label>Date
           <input name="date" type="date" required>
+        </label>
+        <label id="action-due-field" hidden>Due date (optional)
+          <input name="due_date" type="date">
         </label>
         <label>Notes (optional)
           <textarea name="notes" rows="3"></textarea>
         </label>
         <button type="submit">Save</button>
-        <button type="button" id="milestone-cancel" class="link">Cancel</button>
+        <button type="button" id="action-cancel" class="link">Cancel</button>
       </form>
-      <p id="milestone-status" role="status"></p>
+      <p id="action-status" role="status"></p>
     </section>
 
     <section id="events-section" hidden>

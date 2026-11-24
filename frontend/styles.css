@@ -64,10 +64,10 @@ button.link {
   font: inherit;
 }
 
-#status, #form-status, #milestone-status { color: var(--muted); }
-#status.error, #form-status.error, #milestone-status.error { color: var(--error); }
+#status, #form-status, #action-status { color: var(--muted); }
+#status.error, #form-status.error, #action-status.error { color: var(--error); }
 
-#milestone-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+#actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
 button.action { padding: 0 1rem; }
 
 form {
