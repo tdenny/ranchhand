@@ -2,6 +2,7 @@
 #
 #   gha-ranchhand-plan  - read-only; assumable from pull requests and main
 #   gha-ranchhand-apply - can change ranchhand-* resources; assumable only from main
+#   gha-ranchhand-frontend-deploy - can write to the frontend bucket; assumable only from main
 #
 # These roles are deliberately named outside the ranchhand-* pattern the apply role may
 # manage, so a pipeline run cannot edit its own permissions. Change this file with admin
@@ -142,6 +143,15 @@ data "aws_iam_policy_document" "gha_apply" {
   }
 
   statement {
+    sid     = "FrontendBucket"
+    actions = ["s3:*"]
+    resources = [
+      "arn:aws:s3:::ranchhand-frontend-*",
+      "arn:aws:s3:::ranchhand-frontend-*/*",
+    ]
+  }
+
+  statement {
     sid       = "Lambda"
     actions   = ["lambda:*"]
     resources = ["arn:aws:lambda:${var.aws_region}:${local.account_id}:function:ranchhand-*"]
@@ -227,6 +237,38 @@ resource "aws_iam_role_policy" "gha_apply" {
   name   = "terraform-apply"
   role   = aws_iam_role.gha_apply.id
   policy = data.aws_iam_policy_document.gha_apply.json
+}
+
+# --- frontend deploy role ---
+
+# Only syncs files into the frontend bucket; it cannot change infrastructure.
+resource "aws_iam_role" "gha_frontend_deploy" {
+  name                 = "gha-ranchhand-frontend-deploy"
+  assume_role_policy   = data.aws_iam_policy_document.gha_apply_trust.json
+  max_session_duration = 3600
+}
+
+data "aws_iam_policy_document" "gha_frontend_deploy" {
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = ["arn:aws:s3:::${local.frontend_bucket}"]
+  }
+
+  statement {
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["arn:aws:s3:::${local.frontend_bucket}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "gha_frontend_deploy" {
+  name   = "frontend-deploy"
+  role   = aws_iam_role.gha_frontend_deploy.id
+  policy = data.aws_iam_policy_document.gha_frontend_deploy.json
+}
+
+output "gha_frontend_deploy_role_arn" {
+  description = "Role for the frontend workflow's deploy job."
+  value       = aws_iam_role.gha_frontend_deploy.arn
 }
 
 output "gha_plan_role_arn" {
