@@ -64,6 +64,10 @@ GitHub. The roles are defined in ``infra/github-oidc.tf``.
    tables, log groups and IAM roles, and to API Gateway and Cognito. Only the
    ``main`` branch may assume it.
 
+``gha-ranchhand-frontend-deploy``
+   Writes to the frontend bucket only (list, put and delete objects). Used by the
+   deploy job in ``frontend.yml``. Only the ``main`` branch may assume it.
+
 The roles are named outside the ``ranchhand-*`` pattern so the apply role cannot
 change its own permissions. Create or change them with admin credentials, not
 through the pipeline.
@@ -114,3 +118,39 @@ name through ``-backend-config="bucket=..."`` and the
 come from the ``github`` context as ``TF_VAR_github_repository``,
 ``TF_VAR_github_owner_id`` and ``TF_VAR_github_repository_id``. Take the bucket
 name from a GitHub repository variable or secret.
+
+Frontend hosting
+================
+
+The frontend is served from an S3 bucket with website hosting
+(``infra/s3.tf``).
+
+First-time rollout
+------------------
+
+1. With admin credentials, apply the changes to ``infra/github-oidc.tf`` (the
+   new ``gha-ranchhand-frontend-deploy`` role and the apply role's S3 access).
+   The apply role cannot grant itself these:
+
+   .. code-block:: bash
+
+      cd infra
+      terraform apply \
+        -target=aws_iam_role.gha_frontend_deploy \
+        -target=aws_iam_role_policy.gha_frontend_deploy \
+        -target=aws_iam_role_policy.gha_apply
+
+2. Merge to ``main`` so the pipeline creates the bucket and sets the API's
+   ``CORS_ALLOW_ORIGIN`` to the website origin (or run ``terraform apply``
+   locally).
+
+3. Read the outputs and configure GitHub (Settings, Secrets and variables, Actions):
+
+   .. code-block:: bash
+
+      terraform output api_endpoint                  # variable API_BASE_URL
+      terraform output frontend_bucket               # variable FRONTEND_BUCKET
+      terraform output gha_frontend_deploy_role_arn  # secret AWS_FRONTEND_DEPLOY_ROLE_ARN
+
+4. Run the "Ranchhand frontend tests" workflow manually (``workflow_dispatch``)
+   on ``main`` to deploy, then open ``terraform output frontend_url``.
