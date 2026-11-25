@@ -32,6 +32,8 @@ resource "aws_lambda_function" "api" {
       TABLE_NAME = aws_dynamodb_table.herd.name
       LOG_LEVEL  = "INFO"
       API_TOKEN  = random_password.api_token.result
+
+      CORS_ALLOW_ORIGIN = local.frontend_origin
     }
   }
 

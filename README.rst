@@ -97,7 +97,9 @@ from ``file://``, so serve it on port 8080 (port 8000 is DynamoDB Local, and
     python3 -m http.server 8080 --directory frontend
 
 Open http://localhost:8080 and enter the API token when prompted (``local-token``
-locally). The API base URL is set in ``frontend/js/config.js``.
+locally). The API base URL is set in ``frontend/js/config.js``. Production
+builds replace that file in the deploy job of ``frontend.yml``; see
+``docs/setup.rst`` for hosting and deploy setup.
 
 Run the frontend tests (``node:test`` with jsdom and a stubbed ``fetch``, so no
 API needs to be running)::
