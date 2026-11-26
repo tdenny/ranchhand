@@ -56,7 +56,7 @@ async function record(buttonLabel, date) {
 }
 
 const BRED_BUTTONS = ["Record breeding", "Confirm pregnant", "Confirm open", "Record calving"];
-const PREGNANT_BUTTONS = [...BRED_BUTTONS, "Record loss"];
+const PREGNANT_BUTTONS = ["Record calving", "Record loss"];
 
 // The tests below run in order and share the page, so each one starts in the state the last one left.
 
@@ -92,19 +92,13 @@ test("confirming a pregnancy posts the due date, and the profile shows the new s
   assert.equal($("#action-status").textContent, "Pregnancy recorded.");
   assert.equal($("#event-list").children[0].textContent, "Confirmed pregnant2026-05-20 · due 2027-02-01");
   assert.deepEqual(detailRows(), { Breeding: "Pregnant", Due: "2027-02-01" });
-  assert.deepEqual(labels(), PREGNANT_BUTTONS, "only a pregnant cow can lose a pregnancy");
-});
-
-test("a pregnant cow can be confirmed pregnant again; no due date is left out of the request", async () => {
-  await record("Confirm pregnant", "2026-06-01");
-
-  assert.deepEqual(posts()[0].body, { type: "confirmed_pregnant", date: "2026-06-01", notes: null });
+  assert.deepEqual(labels(), PREGNANT_BUTTONS, "a pregnant cow can only calve or lose the pregnancy");
 });
 
 test("only confirming a pregnancy offers a due date", () => {
-  for (const label of PREGNANT_BUTTONS) {
+  for (const label of ["Record calving", "Record loss"]) {
     actionButtons().find((b) => b.textContent === label).click();
-    assert.equal($("#action-due-field").hidden, label !== "Confirm pregnant", label);
+    assert.equal($("#action-due-field").hidden, true, label);
   }
 });
 
