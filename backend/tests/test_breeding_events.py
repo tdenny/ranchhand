@@ -54,24 +54,16 @@ def test_breeding_event_writes_the_event_and_returns_201(table):
     assert item["type"] == "bred"
 
 
-@pytest.mark.parametrize("state", ["unbred", "bred", "pregnant", "open"])
-def test_bred_event_is_accepted_in_every_state_and_moves_to_bred(table, state):
+@pytest.mark.parametrize("state", ["unbred", "bred", "open"])
+def test_bred_event_is_accepted_when_not_pregnant_and_moves_to_bred(table, state):
     put_animal(table, ULID, breeding_state=state)
 
     assert post_breeding("bred")["statusCode"] == 201
     assert profile(table)["breeding_state"] == "bred"
 
 
-def test_bred_event_clears_the_due_date_of_a_pregnant_cow(table):
-    put_animal(table, ULID, breeding_state="pregnant", due_date="2027-02-01")
-
-    post_breeding("bred")
-
-    assert "due_date" not in profile(table)
-
-
 def test_bred_event_changes_the_category(table):
-    put_animal(table, ULID)
+    put_animal(table, ULID, breeding_state="unbred")
     assert json.loads(h.handler(api_event(f"GET /animals/{ULID}"), None)["body"])["category"] == "Heifer"
 
     post_breeding("bred")
@@ -79,23 +71,14 @@ def test_bred_event_changes_the_category(table):
     assert json.loads(h.handler(api_event(f"GET /animals/{ULID}"), None)["body"])["category"] == "Cow"
 
 
-@pytest.mark.parametrize("state", ["bred", "pregnant"])
-def test_confirmed_check_moves_to_pregnant_with_the_given_due_date(table, state):
-    put_animal(table, ULID, breeding_state=state)
+def test_confirmed_check_moves_to_pregnant_with_the_given_due_date(table):
+    put_animal(table, ULID, breeding_state="bred")
 
     response = post_breeding("confirmed_pregnant", due_date="2027-03-01")
 
     assert response["statusCode"] == 201
     assert json.loads(response["body"])["due_date"] == "2027-03-01"
     assert (profile(table)["breeding_state"], profile(table)["due_date"]) == ("pregnant", "2027-03-01")
-
-
-def test_a_recheck_of_a_pregnant_cow_overwrites_the_due_date(table):
-    put_animal(table, ULID, breeding_state="pregnant", due_date="2027-02-01")
-
-    post_breeding("confirmed_pregnant", due_date="2027-03-01")
-
-    assert profile(table)["due_date"] == "2027-03-01"
 
 
 def test_confirmed_check_defaults_the_due_date_to_283_days_after_the_latest_breeding(table):
@@ -121,9 +104,8 @@ def test_confirmed_check_without_a_recorded_breeding_leaves_the_due_date_empty(t
     assert "due_date" not in profile(table)
 
 
-@pytest.mark.parametrize("state", ["bred", "pregnant"])
-def test_open_check_moves_to_open_and_clears_the_due_date(table, state):
-    put_animal(table, ULID, breeding_state=state, due_date="2027-02-01" if state == "pregnant" else None)
+def test_open_check_moves_a_bred_cow_to_open(table):
+    put_animal(table, ULID, breeding_state="bred")
 
     response = post_breeding("confirmed_open")
 
@@ -152,8 +134,9 @@ def test_calved_moves_to_open_and_clears_the_due_date(table, state):
 @pytest.mark.parametrize(
     "event_type, states, msg",
     [
-        ("confirmed_pregnant", ["unbred", "open"], "Only bred or pregnant animals can be pregnancy checked"),
-        ("confirmed_open", ["unbred", "open"], "Only bred or pregnant animals can be pregnancy checked"),
+        ("bred", ["pregnant"], "Pregnant animals can't be bred"),
+        ("confirmed_pregnant", ["unbred", "open", "pregnant"], "Only bred animals can be pregnancy checked"),
+        ("confirmed_open", ["unbred", "open", "pregnant"], "Only bred animals can be pregnancy checked"),
         ("calved", ["unbred", "open"], "Only bred or pregnant animals can calve"),
         ("lost", ["unbred", "bred", "open"], "Only pregnant animals can lose a pregnancy"),
     ],

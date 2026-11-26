@@ -70,6 +70,7 @@ async function addParent(label, parentId) {
 // which is what actually enforces them.
 const femaleIn = (...states) => (animal) => animal.sex === "female" && states.includes(animal.breeding_state);
 const BRED_OR_PREGNANT = femaleIn("bred", "pregnant");
+const BRED = femaleIn("bred");
 
 // The events that can be recorded from this page, which endpoint takes each, and when it applies to an animal.
 const ACTIONS = [
@@ -80,29 +81,28 @@ const ACTIONS = [
     done: "Castration recorded.",
     applies: (animal) => animal.sex === "male" && !animal.castrated,
   },
-  // A cow is bred again and again, whatever state she is in.
+  // A cow is bred again and again, except while she is pregnant.
   {
     type: "bred",
     create: createBreedingEvent,
     label: "Record breeding",
     done: "Breeding recorded.",
-    applies: (animal) => animal.sex === "female",
+    applies: femaleIn("unbred", "bred", "open"),
   },
-  // A recheck of a pregnant cow is fine too, so she can be confirmed pregnant again (with a new due date).
   {
     type: "confirmed_pregnant",
     create: createBreedingEvent,
     label: "Confirm pregnant",
     done: "Pregnancy recorded.",
     dueDate: true,
-    applies: BRED_OR_PREGNANT,
+    applies: BRED,
   },
   {
     type: "confirmed_open",
     create: createBreedingEvent,
     label: "Confirm open",
     done: "Open check recorded.",
-    applies: BRED_OR_PREGNANT,
+    applies: BRED,
   },
   {
     type: "calved",
