@@ -43,7 +43,7 @@ class BreedingTransition(NamedTuple):
 
 
 BRED = frozenset({"bred"})
-BRED_OR_PREGNANT = frozenset({"bred", "pregnant"})
+PREGNANT = frozenset({"pregnant"})
 NOT_PREGNANT = frozenset({"unbred", "bred", "open"})
 FEMALE_ONLY_ERROR = "Only female animals can have breeding events"
 
@@ -51,8 +51,8 @@ TRANSITIONS = {
     "bred": BreedingTransition(NOT_PREGNANT, "bred", "Pregnant animals can't be bred"),
     "confirmed_pregnant": BreedingTransition(BRED, "pregnant", "Only bred animals can be pregnancy checked"),
     "confirmed_open": BreedingTransition(BRED, "open", "Only bred animals can be pregnancy checked"),
-    "calved": BreedingTransition(BRED_OR_PREGNANT, "open", "Only bred or pregnant animals can calve"),
-    "lost": BreedingTransition(frozenset({"pregnant"}), "open", "Only pregnant animals can lose a pregnancy"),
+    "calved": BreedingTransition(PREGNANT, "open", "Only pregnant animals can calve"),
+    "lost": BreedingTransition(PREGNANT, "open", "Only pregnant animals can lose a pregnancy"),
 }
 
 CALF_YEARS = 2

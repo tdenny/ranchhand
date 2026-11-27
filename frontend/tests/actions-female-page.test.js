@@ -55,7 +55,7 @@ async function record(buttonLabel, date) {
   await waitFor(() => posts().length === 1 && /recorded/.test($("#action-status").textContent), "the save");
 }
 
-const BRED_BUTTONS = ["Record breeding", "Confirm pregnant", "Confirm open", "Record calving"];
+const BRED_BUTTONS = ["Record breeding", "Confirm pregnant", "Confirm open"];
 const PREGNANT_BUTTONS = ["Record calving", "Record loss"];
 
 // The tests below run in order and share the page, so each one starts in the state the last one left.
@@ -76,7 +76,7 @@ test("recording breeding posts a bred event, the heifer becomes a cow and the ch
   assert.equal($("#action-status").textContent, "Breeding recorded.");
   assert.equal($("#event-list").children[0].textContent, "Bred2026-05-01");
   assert.equal(category(), "Cow");
-  assert.deepEqual(labels(), BRED_BUTTONS, "a bred cow can be checked or calve, but not lose a pregnancy");
+  assert.deepEqual(labels(), BRED_BUTTONS, "a bred cow can be checked, but not calve or lose a pregnancy");
 });
 
 test("confirming a pregnancy posts the due date, and the profile shows the new state", async () => {
@@ -124,6 +124,7 @@ test("confirming open posts a confirmed_open event and the cow can only be bred 
 
 test("recording calving posts a calved event and the cow is open", async () => {
   await record("Record breeding", "2027-02-01");
+  await record("Confirm pregnant", "2027-02-20");
   await record("Record calving", "2027-11-10");
 
   // A calf is added too, with its sex not known yet.
