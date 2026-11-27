@@ -122,9 +122,8 @@ def test_lost_moves_a_pregnant_cow_to_open_and_clears_the_due_date(table):
     assert "due_date" not in profile(table)
 
 
-@pytest.mark.parametrize("state", ["bred", "pregnant"])
-def test_calved_moves_to_open_and_clears_the_due_date(table, state):
-    put_animal(table, ULID, breeding_state=state, due_date="2027-02-01" if state == "pregnant" else None)
+def test_calved_moves_to_open_and_clears_the_due_date(table):
+    put_animal(table, ULID, breeding_state="pregnant", due_date="2027-02-01")
 
     assert post_breeding("calved")["statusCode"] == 201
     assert profile(table)["breeding_state"] == "open"
@@ -137,7 +136,7 @@ def test_calved_moves_to_open_and_clears_the_due_date(table, state):
         ("bred", ["pregnant"], "Pregnant animals can't be bred"),
         ("confirmed_pregnant", ["unbred", "open", "pregnant"], "Only bred animals can be pregnancy checked"),
         ("confirmed_open", ["unbred", "open", "pregnant"], "Only bred animals can be pregnancy checked"),
-        ("calved", ["unbred", "open"], "Only bred or pregnant animals can calve"),
+        ("calved", ["unbred", "bred", "open"], "Only pregnant animals can calve"),
         ("lost", ["unbred", "bred", "open"], "Only pregnant animals can lose a pregnancy"),
     ],
 )
@@ -212,12 +211,12 @@ def test_breeding_events_are_listed_with_the_animals_other_events(table):
 
 
 def test_breeding_event_is_refused_if_the_state_changed_since_it_was_read(table):
-    put_animal(table, ULID, breeding_state="open")  # the route saw "bred"; the transaction has the last word
+    put_animal(table, ULID, breeding_state="open")  # the route saw "pregnant"; the transaction has the last word
     before = table.scan()["Items"]
     event = models.Event(animal_id=ULID, type="calved", date="2024-05-01")
 
     with pytest.raises(ClientError) as raised:
-        get_repository().put_breeding_event(event, frozenset({"bred", "pregnant"}), "open")
+        get_repository().put_breeding_event(event, frozenset({"pregnant"}), "open")
 
     assert raised.value.response["Error"]["Code"] == "TransactionCanceledException"
     assert table.scan()["Items"] == before

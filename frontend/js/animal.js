@@ -69,7 +69,7 @@ async function addParent(label, parentId) {
 // A female in one of these states; the same rules as TRANSITIONS in backend/src/ranchhand/models.py,
 // which is what actually enforces them.
 const femaleIn = (...states) => (animal) => animal.sex === "female" && states.includes(animal.breeding_state);
-const BRED_OR_PREGNANT = femaleIn("bred", "pregnant");
+const PREGNANT = femaleIn("pregnant");
 const BRED = femaleIn("bred");
 
 // The events that can be recorded from this page, which endpoint takes each, and when it applies to an animal.
@@ -112,14 +112,14 @@ const ACTIONS = [
     // The API adds the calf to the herd, numbered after its dam until it gets an ear tag. Its sex
     // isn't asked for, since it often isn't known yet; it is set later by editing the calf.
     calf: true,
-    applies: BRED_OR_PREGNANT,
+    applies: PREGNANT,
   },
   {
     type: "lost",
     create: createBreedingEvent,
     label: "Record loss",
     done: "Loss recorded.",
-    applies: femaleIn("pregnant"),
+    applies: PREGNANT,
   },
 ];
 
