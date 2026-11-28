@@ -139,6 +139,23 @@ class HerdRepository:
             extra_puts=[self._animal_item(calf)] if calf is not None else [],
         )
 
+    def put_removal_event(self, event: Event, to_status: Status) -> None:
+        """Store a removal event and set the animal's status to to_status.
+
+        One transaction, which also requires the animal to be active when it commits. Raises ClientError
+        (TransactionCanceledException) if it isn't, if it doesn't exist, or if the event id is taken.
+        """
+        self._write_event_and_profile(
+            self._event_item(event),
+            {
+                "Key": animal_key(event.animal_id),
+                "UpdateExpression": "SET #status = :to",
+                "ConditionExpression": "attribute_exists(pk) AND #status = :active",
+                "ExpressionAttributeNames": {"#status": "status"},
+                "ExpressionAttributeValues": {":to": to_status, ":active": "active"},
+            },
+        )
+
     @staticmethod
     def _event_item(event: Event) -> dict:
         return {

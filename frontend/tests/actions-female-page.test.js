@@ -33,7 +33,9 @@ before(async () => {
 
 const $ = (selector) => window.document.querySelector(selector);
 const actionButtons = () => [...window.document.querySelectorAll("#actions button")];
-const labels = () => actionButtons().map((b) => b.textContent);
+// The removal buttons show for any active animal; removal.test.js covers them.
+const REMOVAL_BUTTONS = ["Record sale", "Record death", "Record processing"];
+const labels = () => actionButtons().map((b) => b.textContent).filter((label) => !REMOVAL_BUTTONS.includes(label));
 const posts = () => calls.filter((c) => c.method === "POST");
 const category = () => {
   const dts = [...window.document.querySelectorAll("#profile-details dt")];

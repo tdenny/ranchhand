@@ -45,7 +45,7 @@ test("the form is filled with the animal's current values, including its parent"
   const { elements } = form();
   assert.equal(elements.number.value, "301");
   assert.equal(elements.sex.value, "female");
-  assert.equal(elements.status.value, "active");
+  assert.equal($("#status-summary").textContent.startsWith("Status: Active."), true);
   assert.equal(elements.date_of_birth.value, "2020-04-01");
   assert.equal(elements.sire_id.value, "01BULL");
   assert.equal(elements.dam_id.value, "");
@@ -58,7 +58,6 @@ test("the form is filled with the animal's current values, including its parent"
 test("saving PUTs the complete animal, so a cleared field is sent as cleared", async () => {
   const { elements } = form();
   elements.number.value = "302";
-  elements.status.value = "sold";
   elements.sire_id.value = "";
   calls = [];
 
@@ -66,10 +65,14 @@ test("saving PUTs the complete animal, so a cleared field is sent as cleared", a
   await waitFor(() => $("#form-status").textContent === "Saved.", "the success message");
 
   assert.deepEqual(puts()[0].body, {
-    number: "302", sex: "female", status: "sold", date_of_birth: "2020-04-01",
+    number: "302", sex: "female", status: "active", date_of_birth: "2020-04-01",
     sire_id: "", dam_id: "", castrated: false, breeding_state: "pregnant", due_date: "2027-02-01",
   });
   assert.equal($("#edit-title").textContent, "Edit #302");
+});
+
+test("the status is text, not a field, so it can't be changed from this form", () => {
+  assert.equal(form().elements.status, undefined);
 });
 
 test("the breeding state is text, not a field, so it can't be changed from this form", () => {

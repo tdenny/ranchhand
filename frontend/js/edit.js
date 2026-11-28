@@ -9,7 +9,7 @@ import {
   updateAnimal,
 } from "./api.js";
 import { askForToken } from "./auth.js";
-import { BREEDING_LABELS } from "./labels.js";
+import { BREEDING_LABELS, STATUS_LABELS } from "./labels.js";
 import { setupParentPicker } from "./parent-picker.js";
 
 const animalId = new URLSearchParams(window.location.search).get("id");
@@ -85,12 +85,12 @@ async function fillForm(animal) {
   elements.sex.querySelector("option[value='']").disabled = !sexUnknown;
   elements.sex.value = animal.sex ?? "";
 
-  // External animals are made on their own page, and the add form doesn't offer the status, so
-  // only an animal that already is external gets it as an option (and may lack a date of birth).
+  // External animals are made on their own page and may lack a date of birth. The status isn't
+  // editable (only removal events change it), so it is shown as text and sent back as it was.
   const isExternal = animal.status === "external";
-  const externalOption = elements.status.querySelector("option[value=external]");
-  externalOption.hidden = externalOption.disabled = !isExternal;
-  elements.status.value = animal.status;
+  document.querySelector("#status-summary").textContent = isExternal
+    ? "Status: External."
+    : `Status: ${STATUS_LABELS[animal.status]}.${animal.status === "active" ? " Record a sale, death or processing on the animal's page to remove it from the herd." : ""}`;
   elements.date_of_birth.required = !isExternal;
   elements.date_of_birth.value = animal.date_of_birth ?? "";
 
@@ -154,7 +154,7 @@ formEl.addEventListener("submit", async (event) => {
     const animal = await updateAnimal(animalId, {
       number: elements.number.value,
       sex: elements.sex.value || null,
-      status: elements.status.value,
+      status: current.status,
       date_of_birth: elements.date_of_birth.value || null,
       sire_id: elements.sire_id.value,
       dam_id: elements.dam_id.value,
