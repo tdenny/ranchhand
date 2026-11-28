@@ -36,6 +36,21 @@ const statusRow = () =>
   [...window.document.querySelectorAll("#profile-details dt")].find((dt) => dt.textContent === "Status")
     .nextElementSibling.textContent;
 
+const sectionButtons = (id) =>
+  [...window.document.querySelectorAll(`#${id} button`)].map((b) => b.textContent);
+const sectionHeading = (id) => $(`#${id} h2`).textContent;
+
+test("the buttons are in a breeding section and a removal section", async () => {
+  await waitFor(() => actionLabels().length, "the action buttons");
+
+  assert.equal(sectionHeading("breeding-actions"), "Breeding");
+  assert.deepEqual(sectionButtons("breeding-actions"), ["Record calving", "Record loss"]);
+  assert.equal(sectionHeading("removal-actions"), "Removal");
+  assert.deepEqual(sectionButtons("removal-actions"), ["Record sale", "Record death", "Record processing"]);
+  assert.equal($("#breeding-actions").hidden, false);
+  assert.equal($("#removal-actions").hidden, false);
+});
+
 test("an active animal can be sold, die or be processed", async () => {
   await waitFor(() => actionLabels().length, "the action buttons");
 
@@ -60,4 +75,6 @@ test("recording a death posts a died event, sets the status and takes every acti
   assert.equal($("#event-list").children[0].textContent, "Died2026-11-20blackleg");
   assert.equal(statusRow(), "deceased");
   assert.deepEqual(actionLabels(), [], "a removed animal has nothing left to record");
+  assert.equal($("#breeding-actions").hidden, true);
+  assert.equal($("#removal-actions").hidden, true);
 });
