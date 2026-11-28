@@ -4,6 +4,7 @@ import {
   ValidationError,
   createBreedingEvent,
   createEvent,
+  createRemovalEvent,
   getAnimal,
   getToken,
   listAnimalEvents,
@@ -72,7 +73,8 @@ const femaleIn = (...states) => (animal) => animal.sex === "female" && states.in
 const PREGNANT = femaleIn("pregnant");
 const BRED = femaleIn("bred");
 
-// The events that can be recorded from this page, which endpoint takes each, and when it applies to an animal.
+// The events that can be recorded from this page, which endpoint takes each, and when it applies to an
+// animal. None applies once the animal has left the herd.
 const ACTIONS = [
   {
     type: "castrated",
@@ -121,6 +123,28 @@ const ACTIONS = [
     done: "Loss recorded.",
     applies: PREGNANT,
   },
+  // These take the animal out of the herd, and nothing brings it back yet.
+  {
+    type: "sold",
+    create: createRemovalEvent,
+    label: "Record sale",
+    done: "Sale recorded.",
+    applies: () => true,
+  },
+  {
+    type: "died",
+    create: createRemovalEvent,
+    label: "Record death",
+    done: "Death recorded.",
+    applies: () => true,
+  },
+  {
+    type: "processed",
+    create: createRemovalEvent,
+    label: "Record processing",
+    done: "Processing recorded.",
+    applies: () => true,
+  },
 ];
 
 let activeAction = null;
@@ -143,7 +167,7 @@ function openActionForm(action) {
 
 function renderActions(animal) {
   closeActionForm();
-  const buttons = ACTIONS.filter((action) => action.applies(animal)).map((action) => {
+  const buttons = ACTIONS.filter((action) => animal.status === "active" && action.applies(animal)).map((action) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "action";

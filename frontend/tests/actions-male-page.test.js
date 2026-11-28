@@ -36,6 +36,9 @@ before(async () => {
 
 const $ = (selector) => window.document.querySelector(selector);
 const actionButtons = () => [...window.document.querySelectorAll("#actions button")];
+// The removal buttons show for any active animal; removal-actions-page.test.js covers them.
+const REMOVAL_BUTTONS = ["Record sale", "Record death", "Record processing"];
+const labels = () => actionButtons().map((b) => b.textContent).filter((label) => !REMOVAL_BUTTONS.includes(label));
 const posts = () => calls.filter((c) => c.method === "POST");
 const profile = () => {
   const dts = [...window.document.querySelectorAll("#profile-details dt")];
@@ -46,7 +49,7 @@ const profile = () => {
 test("an uncastrated male gets a Record castration button, and the form stays closed until it is clicked", async () => {
   await waitFor(() => actionButtons().length, "the action button");
 
-  assert.deepEqual(actionButtons().map((b) => b.textContent), ["Record castration"], "no breeding or calving for a male");
+  assert.deepEqual(labels(), ["Record castration"], "no breeding or calving for a male");
   assert.equal($("#action-form").hidden, true);
   assert.equal(profile().Category, "Bull");
 });
@@ -73,7 +76,7 @@ test("a rejected request shows the API's message and keeps the form open", async
 
   assert.match($("#action-status").textContent, /Only male animals can be castrated/);
   assert.equal($("#action-form").hidden, false);
-  assert.equal(actionButtons().length, 1);
+  assert.equal(labels().length, 1);
   assert.equal($("#event-list").children.length, 0);
 });
 
@@ -89,6 +92,6 @@ test("saving posts the castration, adds it to the events, and shows the animal a
   assert.deepEqual(posts()[0].body, { type: "castrated", date: "2026-11-01", notes: "banded" });
   assert.equal($("#event-list").children[0].textContent, "Castrated2026-11-01banded");
   assert.equal(profile().Category, "Steer");
-  assert.equal(actionButtons().length, 0, "an animal that is already castrated cannot be castrated again");
+  assert.equal(labels().length, 0, "an animal that is already castrated cannot be castrated again");
   assert.equal(form.hidden, true);
 });

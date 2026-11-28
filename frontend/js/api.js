@@ -98,3 +98,7 @@ export function createEvent(animalId, event) {
 export function createBreedingEvent(animalId, event) {
   return request(`/animals/${encodeURIComponent(animalId)}/breeding-events`, { method: "POST", body: event });
 }
+
+export function createRemovalEvent(animalId, event) {
+  return request(`/animals/${encodeURIComponent(animalId)}/removal-events`, { method: "POST", body: event });
+}
