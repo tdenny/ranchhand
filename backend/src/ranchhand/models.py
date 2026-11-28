@@ -13,7 +13,21 @@ LogEventType = Literal["castrated", "weaned", "note"]
 # Breeding events are the recurring workflow of a mature cow and move her through the BreedingStates.
 # A pregnancy check is recorded as what it found, so each outcome is its own event type.
 BreedingEventType = Literal["bred", "confirmed_pregnant", "confirmed_open", "calved", "lost"]
-EventType = Literal["castrated", "weaned", "note", "bred", "confirmed_pregnant", "confirmed_open", "calved", "lost"]
+# Removal events take an active animal out of the herd, and each one sets the animal's status.
+RemovalEventType = Literal["sold", "died", "processed"]
+EventType = Literal[
+    "castrated",
+    "weaned",
+    "note",
+    "bred",
+    "confirmed_pregnant",
+    "confirmed_open",
+    "calved",
+    "lost",
+    "sold",
+    "died",
+    "processed",
+]
 Category = Literal["Cow", "Bull", "Heifer", "Steer", "Heifer calf", "Bull calf", "Calf"]
 
 GESTATION_DAYS = 283
@@ -54,6 +68,10 @@ TRANSITIONS = {
     "calved": BreedingTransition(PREGNANT, "open", "Only pregnant animals can calve"),
     "lost": BreedingTransition(PREGNANT, "open", "Only pregnant animals can lose a pregnancy"),
 }
+
+# The status each removal event leaves the animal in; they all require it to be active.
+REMOVAL_STATUS: dict[RemovalEventType, Status] = {"sold": "sold", "died": "deceased", "processed": "processed"}
+NOT_ACTIVE_ERROR = "Only active animals can be removed from the herd"
 
 CALF_YEARS = 2
 
@@ -174,6 +192,18 @@ class BreedingEventIn(BaseModel):
     @property
     def transition(self) -> BreedingTransition:
         return TRANSITIONS[self.type]
+
+
+class RemovalEventIn(BaseModel):
+    """Request body for POST /animals/<animal_id>/removal-events."""
+
+    type: RemovalEventType
+    date: date
+    notes: str | None = None
+
+    @property
+    def to_status(self) -> Status:
+        return REMOVAL_STATUS[self.type]
 
 
 class Event(BaseModel):

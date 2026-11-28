@@ -13,6 +13,7 @@ from ranchhand.models import (
     FEMALE_ONLY_ERROR,
     GESTATION_DAYS,
     MILESTONES,
+    NOT_ACTIVE_ERROR,
     Animal,
     AnimalIn,
     AnimalList,
@@ -20,6 +21,7 @@ from ranchhand.models import (
     Event,
     EventIn,
     EventList,
+    RemovalEventIn,
     Status,
 )
 from ranchhand.repository import get_repository
@@ -129,6 +131,16 @@ def breeding_state_errors(animal_in: AnimalIn, current: Animal) -> list[dict]:
     return errors
 
 
+STATUS_LOCKED = "Removal events change this; it can't be edited"
+
+
+def status_errors(animal_in: AnimalIn, current: Animal) -> list[dict]:
+    """Return a validation error if an edit would change the status, which only a removal event does."""
+    if animal_in.status == current.status:
+        return []
+    return [{"type": "value_error", "loc": ["body", "status"], "msg": STATUS_LOCKED}]
+
+
 @app.post("/animals")
 def create_animal(animal_in: AnimalIn) -> Response[Animal]:
     """Write a new animal profile to the herd table."""
@@ -182,14 +194,19 @@ def get_animal(animal_id: str) -> Response[Animal]:
 def update_animal(animal_id: str, animal_in: AnimalIn) -> Response[Animal]:
     """Replace every editable field of an existing animal; its id (and its events) stay as they were.
 
-    The exception is its breeding state and due date, which only breeding events change."""
+    The exceptions are its breeding state and due date, which only breeding events change, and its
+    status, which only removal events change."""
     repo = get_repository()
     current = repo.get_animal(animal_id)
 
     if current is None:
         raise NotFoundError(f"Animal {animal_id} not found")
 
-    if errors := invalid_parent_errors(animal_in, animal_id) + breeding_state_errors(animal_in, current):
+    if (
+        errors := invalid_parent_errors(animal_in, animal_id)
+        + breeding_state_errors(animal_in, current)
+        + status_errors(animal_in, current)
+    ):
         raise RequestValidationError(errors)
 
     animal = Animal(id=animal_id, **animal_in.model_dump())
@@ -254,6 +271,29 @@ def create_animal_breeding_event(animal_id: str, event_in: BreedingEventIn) -> R
             dam_id=animal_id,
         )
     repo.put_breeding_event(event, transition.from_states, transition.to_state, calf)
+
+    return Response(
+        status_code=201,
+        content_type="application/json",
+        headers={"location": f"/animals/{animal_id}/events/{event.id}"},
+        body=event,
+    )
+
+
+@app.post("/animals/<animal_id>/removal-events")
+def create_animal_removal_event(animal_id: str, event_in: RemovalEventIn) -> Response[Event]:
+    """Write a removal event (sold, died, processed) for an active animal, and set its status to match."""
+    repo = get_repository()
+    animal = repo.get_animal(animal_id)
+
+    if animal is None:
+        raise NotFoundError(f"Animal {animal_id} not found")
+
+    if animal.status != "active":
+        raise RequestValidationError([{"type": "value_error", "loc": ["body", "type"], "msg": NOT_ACTIVE_ERROR}])
+
+    event = Event(animal_id=animal_id, **event_in.model_dump())
+    repo.put_removal_event(event, event_in.to_status)
 
     return Response(
         status_code=201,

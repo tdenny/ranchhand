@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from helpers import BODY, ULID, api_event, put_animal
 
 from ranchhand import handler as h
@@ -28,7 +29,7 @@ def test_update_animal_replaces_every_field_and_returns_it(table):
     put_animal(table, "SIRE", sex="male", number="1")
     new = {
         "number": "102",
-        "status": "sold",
+        "status": "active",
         "sex": "male",
         "date_of_birth": "2021-05-06",
         "sire_id": "SIRE",
@@ -194,3 +195,25 @@ def test_update_animal_can_set_the_sex_of_a_calf_whose_sex_was_unknown(table):
 
     assert response["statusCode"] == 200
     assert stored_state(table) == ("unbred", None)
+
+
+@pytest.mark.parametrize("status", ["sold", "deceased", "processed", "external"])
+def test_update_animal_cannot_change_its_status(table, status):
+    put_animal(table, ULID)
+    before = table.scan()["Items"]
+
+    response = h.handler(update_event(ULID, {**BODY, "status": status}), None)
+
+    assert response["statusCode"] == 400
+    assert [(e["loc"], e["msg"]) for e in json.loads(response["body"])["errors"]] == [
+        (["body", "status"], "Removal events change this; it can't be edited")
+    ]
+    assert table.scan()["Items"] == before
+
+
+def test_update_animal_can_edit_a_removed_animal_that_keeps_its_status(table):
+    put_animal(table, ULID, status="sold")
+
+    response = h.handler(update_event(ULID, {**BODY, "status": "sold", "number": "102"}), None)
+
+    assert response["statusCode"] == 200
