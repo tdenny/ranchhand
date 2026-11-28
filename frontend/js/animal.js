@@ -23,7 +23,6 @@ const eventsStatusEl = document.querySelector("#events-status");
 const eventListEl = document.querySelector("#event-list");
 const formEl = document.querySelector("#event-form");
 const formStatusEl = document.querySelector("#form-status");
-const actionsEl = document.querySelector("#actions");
 const actionFormEl = document.querySelector("#action-form");
 const actionTitleEl = document.querySelector("#action-title");
 const actionStatusEl = document.querySelector("#action-status");
@@ -73,11 +72,13 @@ const femaleIn = (...states) => (animal) => animal.sex === "female" && states.in
 const PREGNANT = femaleIn("pregnant");
 const BRED = femaleIn("bred");
 
-// The events that can be recorded from this page, which endpoint takes each, and when it applies to an
-// animal. None applies once the animal has left the herd.
+// The events that can be recorded from this page: which section each is in (breeding or removal),
+// which endpoint takes it, and when it applies to an animal. None applies once the animal has left
+// the herd.
 const ACTIONS = [
   {
     type: "castrated",
+    group: "breeding",
     create: createEvent,
     label: "Record castration",
     done: "Castration recorded.",
@@ -86,6 +87,7 @@ const ACTIONS = [
   // A cow is bred again and again, except while she is pregnant.
   {
     type: "bred",
+    group: "breeding",
     create: createBreedingEvent,
     label: "Record breeding",
     done: "Breeding recorded.",
@@ -93,6 +95,7 @@ const ACTIONS = [
   },
   {
     type: "confirmed_pregnant",
+    group: "breeding",
     create: createBreedingEvent,
     label: "Confirm pregnant",
     done: "Pregnancy recorded.",
@@ -101,6 +104,7 @@ const ACTIONS = [
   },
   {
     type: "confirmed_open",
+    group: "breeding",
     create: createBreedingEvent,
     label: "Confirm open",
     done: "Open check recorded.",
@@ -108,6 +112,7 @@ const ACTIONS = [
   },
   {
     type: "calved",
+    group: "breeding",
     create: createBreedingEvent,
     label: "Record calving",
     done: "Calving recorded.",
@@ -118,6 +123,7 @@ const ACTIONS = [
   },
   {
     type: "lost",
+    group: "breeding",
     create: createBreedingEvent,
     label: "Record loss",
     done: "Loss recorded.",
@@ -126,6 +132,7 @@ const ACTIONS = [
   // These take the animal out of the herd, and nothing brings it back yet.
   {
     type: "sold",
+    group: "removal",
     create: createRemovalEvent,
     label: "Record sale",
     done: "Sale recorded.",
@@ -133,6 +140,7 @@ const ACTIONS = [
   },
   {
     type: "died",
+    group: "removal",
     create: createRemovalEvent,
     label: "Record death",
     done: "Death recorded.",
@@ -140,6 +148,7 @@ const ACTIONS = [
   },
   {
     type: "processed",
+    group: "removal",
     create: createRemovalEvent,
     label: "Record processing",
     done: "Processing recorded.",
@@ -167,15 +176,22 @@ function openActionForm(action) {
 
 function renderActions(animal) {
   closeActionForm();
-  const buttons = ACTIONS.filter((action) => animal.status === "active" && action.applies(animal)).map((action) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "action";
-    button.textContent = action.label;
-    button.addEventListener("click", () => openActionForm(action));
-    return button;
-  });
-  actionsEl.replaceChildren(...buttons);
+  for (const group of ["breeding", "removal"]) {
+    const buttons = ACTIONS.filter(
+      (action) => action.group === group && animal.status === "active" && action.applies(animal),
+    ).map((action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "action";
+      button.textContent = action.label;
+      button.addEventListener("click", () => openActionForm(action));
+      return button;
+    });
+    const groupEl = document.querySelector(`#${group}-actions`);
+    groupEl.querySelector(".buttons").replaceChildren(...buttons);
+    // A section with nothing to do (a steer's breeding, a removed animal's removal) isn't shown.
+    groupEl.hidden = !buttons.length;
+  }
 }
 
 function renderProfile(animal) {
